@@ -113,4 +113,4 @@ WhiteBoard-Collaborator/
 - **Port already in use** – Change `PORT` in `server/.env` (e.g. `4100`) and update `NEXT_PUBLIC_WS_URL` accordingly.
 - **Slow canvas performance** – Reduce the number of simultaneous collaborators or clear unused layers via the toolbar; Konva renders all shapes on each frame.
 
-Enjoy collaborating locally!
+Enjoy collaborating!
