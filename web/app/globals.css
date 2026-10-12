@@ -75,3 +75,1400 @@ button:disabled {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* =========================================================
+   Whiteboard workspace themes
+   ========================================================= */
+
+.wb-light .wb-canvas {
+  background-color: #f8fafc !important;
+  background-image:
+    radial-gradient(
+      circle,
+      rgba(71, 85, 105, 0.10) 1px,
+      transparent 1px
+    ) !important;
+}
+
+/* Light-mode command surfaces */
+.wb-light .wb-toolbar,
+.wb-light .wb-board-title,
+.wb-light .wb-back,
+.wb-light .wb-share,
+.wb-light .wb-chat-launcher {
+  border-color: #6f8fef !important;
+  background: #6f8fef !important;
+  color: #f8fafc !important;
+  box-shadow:
+    0 2px 7px rgba(57, 84, 157, 0.18) !important;
+}
+
+.wb-light .wb-board-title span,
+.wb-light .wb-share span {
+  color: #f8fafc !important;
+}
+
+.wb-light .wb-toolbar svg,
+.wb-light .wb-board-title svg,
+.wb-light .wb-back svg,
+.wb-light .wb-share svg,
+.wb-light .wb-chat-launcher svg {
+  color: #f8fafc !important;
+}
+
+.wb-light .wb-back:hover,
+.wb-light .wb-share:hover,
+.wb-light .wb-chat-launcher:hover {
+  border-color: #6384e8 !important;
+  background: #6384e8 !important;
+  color: #ffffff !important;
+}
+
+/* Toolbar buttons only — popovers retain their normal surfaces */
+.wb-light .wb-toolbar > div button {
+  color: #f8fafc;
+}
+
+.wb-light .wb-toolbar > div button:hover {
+  background: rgba(255, 255, 255, 0.13);
+  color: #ffffff;
+}
+
+/* Active toolbar controls */
+.wb-light .wb-toolbar > div button[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.20) !important;
+  color: #ffffff !important;
+}
+
+/* Dividers become subtle blue-white */
+.wb-light .wb-toolbar > div > div[class*="w-px"] {
+  background: rgba(255, 255, 255, 0.24) !important;
+}
+
+/* Live stays neutral so green status remains clear */
+.wb-light .wb-live {
+  border-color: #b7dfc4 !important;
+  background: #eaf8ef !important;
+  color: #315a3d !important;
+  box-shadow:
+    0 2px 6px rgba(46, 125, 73, 0.10) !important;
+}
+
+.wb-light .wb-live span {
+  color: #315a3d !important;
+}
+
+/* Share / popup panels */
+.wb-light .wb-panel,
+.wb-light .wb-modal {
+  border-color: #d9dde3 !important;
+  background: #ffffff !important;
+  color: #20242a !important;
+}
+
+.wb-light .wb-panel p,
+.wb-light .wb-modal p {
+  color: #737b87 !important;
+}
+
+/* Chat */
+.wb-light .wb-chat-panel {
+  border-color: #d8dde4 !important;
+  background: #ffffff !important;
+  color: #20242a !important;
+  box-shadow:
+    0 7px 22px rgba(71, 85, 105, 0.14) !important;
+}
+
+.wb-light .wb-chat-divider {
+  border-color: #e4e7eb !important;
+}
+
+.wb-light .wb-chat-composer {
+  border-color: #d4d9df !important;
+  background: #f5f6f8 !important;
+}
+
+.wb-light .wb-chat-composer:focus-within {
+  border-color: #aeb5bf !important;
+}
+
+.wb-light .wb-chat-input {
+  color: #20242a !important;
+}
+
+.wb-light .wb-chat-input::placeholder {
+  color: #9aa1ab !important;
+}
+
+.wb-light .wb-chat-hint {
+  color: #818995 !important;
+}
+
+.wb-light .wb-muted {
+  color: #929aa5 !important;
+}
+
+.wb-light .wb-modal input {
+  border-color: #d5dae0 !important;
+  background: #f5f6f8 !important;
+  color: #20242a !important;
+}
+
+.wb-light .wb-modal input::placeholder {
+  color: #9aa1ab !important;
+}
+
+/* Theme capsule */
+.wb-dark .wb-live {
+  border-color: #304a39 !important;
+  background: #18201b !important;
+  color: #d7e7dc !important;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.18) !important;
+}
+
+.wb-dark .wb-live span {
+  color: #d7e7dc !important;
+}
+
+/* Light-mode text controls need charcoal contrast */
+.wb-light .wb-toolbar .wb-font-trigger,
+.wb-light .wb-toolbar .wb-font-size-trigger,
+.wb-light .wb-toolbar [data-wb-font-family="true"],
+.wb-light .wb-toolbar [data-wb-font-size="true"] {
+  color: #303640 !important;
+}
+
+.wb-light .wb-toolbar .wb-font-trigger svg,
+.wb-light .wb-toolbar .wb-font-size-trigger svg,
+.wb-light .wb-toolbar [data-wb-font-family="true"] svg,
+.wb-light .wb-toolbar [data-wb-font-size="true"] svg {
+  color: #434a55 !important;
+}
+
+/* Custom dropdown menu content stays readable */
+.wb-light .wb-toolbar [role="menu"] {
+  color: #303640;
+}
+
+.wb-light .wb-toolbar [role="menu"] button {
+  color: #303640 !important;
+}
+
+.wb-light .wb-toolbar [role="menu"] button:hover {
+  color: #20242a !important;
+  background: #f1f3f6 !important;
+}
+
+/* =========================================================
+   Scenic day / night workspace switch
+   ========================================================= */
+
+.wb-daynight {
+  --switch-w: 104px;
+  --switch-h: 46px;
+  --pad: 4px;
+  --orb: 36px;
+  --travel: 60px;
+  --motion: 360ms;
+
+  position: relative;
+  display: block;
+  width: var(--switch-w);
+  height: var(--switch-h);
+
+  overflow: hidden;
+  isolation: isolate;
+
+  border: 1px solid transparent;
+  border-radius: 999px;
+
+  cursor: default;
+
+  transition:
+    background-color var(--motion)
+      cubic-bezier(0.22, 1, 0.36, 1),
+    border-color var(--motion)
+      cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow var(--motion)
+      cubic-bezier(0.22, 1, 0.36, 1);
+
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.18),
+    0 3px 10px rgba(15, 23, 42, 0.18);
+}
+
+.wb-daynight--light {
+  background: #68b8e8;
+  border-color: #91cbed;
+}
+
+.wb-daynight--dark {
+  background: #202735;
+  border-color: #414958;
+}
+
+
+/* ---------------------------------------------------------
+   DAY SCENE
+   --------------------------------------------------------- */
+
+.wb-daynight__day {
+  position: absolute;
+  inset: 0;
+
+  opacity: 1;
+
+  transition:
+    opacity 260ms ease,
+    transform var(--motion)
+      cubic-bezier(0.22, 1, 0.36, 1);
+
+  transform: translateX(0);
+}
+
+.wb-daynight--dark .wb-daynight__day {
+  opacity: 0;
+  transform: translateX(-8px);
+}
+
+
+/* CLOUDS */
+
+.wb-daynight__cloud {
+  position: absolute;
+
+  display: block;
+
+  background: rgba(248, 250, 252, 0.94);
+
+  border-radius: 999px;
+
+  transform-origin: center;
+
+  animation:
+    wb-cloud-vibe 4s ease-in-out
+    infinite alternate;
+}
+
+.wb-daynight__cloud::before,
+.wb-daynight__cloud::after {
+  content: '';
+
+  position: absolute;
+
+  display: block;
+
+  background: inherit;
+
+  border-radius: 50%;
+}
+
+.wb-daynight__cloud--1 {
+  right: 8px;
+  bottom: 7px;
+
+  width: 39px;
+  height: 10px;
+}
+
+.wb-daynight__cloud--1::before {
+  width: 16px;
+  height: 16px;
+
+  left: 6px;
+  top: -7px;
+}
+
+.wb-daynight__cloud--1::after {
+  width: 20px;
+  height: 20px;
+
+  right: 5px;
+  top: -10px;
+}
+
+.wb-daynight__cloud--2 {
+  right: 30px;
+  bottom: 4px;
+
+  width: 31px;
+  height: 8px;
+
+  opacity: 0.72;
+
+  animation-delay: 500ms;
+  animation-duration: 3.2s;
+}
+
+.wb-daynight__cloud--2::before {
+  width: 13px;
+  height: 13px;
+
+  left: 6px;
+  top: -6px;
+}
+
+.wb-daynight__cloud--2::after {
+  width: 14px;
+  height: 14px;
+
+  right: 4px;
+  top: -7px;
+}
+
+.wb-daynight__cloud--3 {
+  right: -5px;
+  bottom: -1px;
+
+  width: 48px;
+  height: 9px;
+
+  opacity: 0.46;
+
+  animation-delay: 900ms;
+  animation-duration: 3.7s;
+}
+
+.wb-daynight__cloud--3::before {
+  width: 15px;
+  height: 15px;
+
+  left: 7px;
+  top: -7px;
+}
+
+.wb-daynight__cloud--3::after {
+  width: 18px;
+  height: 18px;
+
+  right: 9px;
+  top: -9px;
+}
+
+
+/* MOUNTAINS */
+
+.wb-daynight__mountain {
+  position: absolute;
+
+  bottom: -16px;
+
+  display: block;
+
+  width: 34px;
+  height: 34px;
+
+  transform: rotate(45deg);
+
+  border-radius: 5px 0 0 0;
+
+  background: rgba(222, 235, 245, 0.92);
+
+  transition:
+    transform var(--motion)
+      cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 250ms ease;
+}
+
+.wb-daynight__mountain--1 {
+  right: 26px;
+}
+
+.wb-daynight__mountain--2 {
+  right: 5px;
+
+  width: 27px;
+  height: 27px;
+
+  bottom: -13px;
+
+  background: rgba(197, 218, 233, 0.88);
+}
+
+
+/* ---------------------------------------------------------
+   NIGHT SCENE
+   --------------------------------------------------------- */
+
+.wb-daynight__night {
+  position: absolute;
+  inset: 0;
+
+  opacity: 0;
+
+  transition:
+    opacity 260ms ease,
+    transform var(--motion)
+      cubic-bezier(0.22, 1, 0.36, 1);
+
+  transform: translateX(8px);
+}
+
+.wb-daynight--dark .wb-daynight__night {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.wb-daynight__star {
+  position: absolute;
+
+  width: 3px;
+  height: 3px;
+
+  border-radius: 50%;
+
+  background: #f4efe4;
+
+  box-shadow:
+    0 0 4px rgba(244, 239, 228, 0.42);
+
+  animation:
+    wb-star-pulse 2.8s ease-in-out
+    infinite alternate;
+}
+
+.wb-daynight__star--1 {
+  left: 15px;
+  top: 11px;
+}
+
+.wb-daynight__star--2 {
+  left: 28px;
+  top: 26px;
+
+  width: 2px;
+  height: 2px;
+
+  animation-delay: 450ms;
+}
+
+.wb-daynight__star--3 {
+  left: 42px;
+  top: 15px;
+
+  animation-delay: 900ms;
+}
+
+.wb-daynight__star--4 {
+  left: 51px;
+  top: 31px;
+
+  width: 2px;
+  height: 2px;
+
+  animation-delay: 1.2s;
+}
+
+.wb-daynight__star--5 {
+  left: 21px;
+  top: 34px;
+
+  width: 2px;
+  height: 2px;
+
+  animation-delay: 1.55s;
+}
+
+
+
+
+.wb-daynight__day,
+.wb-daynight__night,
+.wb-daynight__cloud,
+.wb-daynight__mountain,
+.wb-daynight__star {
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------
+   CELESTIAL SLIDER
+   --------------------------------------------------------- */
+
+.wb-daynight__celestial {
+  position: absolute;
+
+  appearance: none;
+  padding: 0;
+  cursor: pointer;
+
+  left: var(--pad);
+  top: var(--pad);
+
+  z-index: 3;
+
+  display: flex;
+
+  width: var(--orb);
+  height: var(--orb);
+
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  transition:
+    transform var(--motion)
+      cubic-bezier(0.22, 1, 0.36, 1),
+    background-color var(--motion)
+      cubic-bezier(0.22, 1, 0.36, 1),
+    border-color var(--motion)
+      cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow var(--motion)
+      cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wb-daynight--light .wb-daynight__celestial {
+  transform: translateX(0);
+
+  background: #f6c83d;
+  border: 1px solid #e5a921;
+
+  box-shadow:
+    0 2px 7px rgba(187, 105, 16, 0.28),
+    inset 0 1px 2px rgba(255, 255, 255, 0.38);
+}
+
+.wb-daynight--dark .wb-daynight__celestial {
+  transform: translateX(var(--travel));
+
+  background: #667080;
+  border: 1px solid #7d8796;
+
+  box-shadow:
+    0 3px 9px rgba(0, 0, 0, 0.34),
+    inset -5px -4px 8px rgba(38, 44, 54, 0.26),
+    inset 4px 3px 6px rgba(255, 255, 255, 0.08);
+}
+
+.wb-daynight__sun-icon {
+  color: #c96a1a;
+}
+
+.wb-daynight__moon-icon {
+  color: #eee6d4;
+}
+
+
+/* ---------------------------------------------------------
+   HOVER / FOCUS
+   --------------------------------------------------------- */
+
+.wb-daynight__celestial:hover {
+  filter: brightness(1.04);
+}
+
+.wb-daynight--light .wb-daynight__celestial:hover {
+  box-shadow:
+    0 4px 11px rgba(187, 105, 16, 0.34),
+    inset 0 1px 2px rgba(255, 255, 255, 0.42);
+}
+
+.wb-daynight--dark .wb-daynight__celestial:hover {
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.40),
+    inset -5px -4px 8px rgba(38, 44, 54, 0.26),
+    inset 4px 3px 6px rgba(255, 255, 255, 0.10);
+}
+
+.wb-daynight__celestial:focus {
+  outline: none;
+}
+
+.wb-daynight__celestial:focus-visible {
+  outline: 2px solid #6f8fef;
+  outline-offset: 3px;
+}
+
+
+/* ---------------------------------------------------------
+   MOTION
+   --------------------------------------------------------- */
+
+@keyframes wb-cloud-vibe {
+  from {
+    transform: scale(1);
+  }
+
+  to {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes wb-star-pulse {
+  from {
+    opacity: 0.45;
+    transform: scale(0.8);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wb-daynight,
+  .wb-daynight *,
+  .wb-daynight *::before,
+  .wb-daynight *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
+/* Editable board title — no browser/Tailwind focus rectangle */
+.wb-board-title input[aria-label="Board name"],
+.wb-board-title input[aria-label="Board name"]:hover,
+.wb-board-title input[aria-label="Board name"]:focus,
+.wb-board-title input[aria-label="Board name"]:focus-visible {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+
+  --tw-ring-offset-shadow: 0 0 #0000 !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+  --tw-shadow: 0 0 #0000 !important;
+}
+
+/* Prevent the parent title capsule from gaining a focus ring */
+.wb-board-title:focus-within {
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Preserve the normal title-capsule border while editing */
+.wb-dark .wb-board-title:focus-within {
+  border-color: #2c2f33 !important;
+}
+
+.wb-light .wb-board-title:focus-within {
+  border-color: #6f8fef !important;
+}
+
+/* =========================================================
+   Premium export modal
+   ========================================================= */
+
+.wb-export-backdrop {
+  animation: wb-export-backdrop-in 140ms ease-out;
+}
+
+.wb-export-modal {
+  animation: wb-export-panel-in 160ms
+    cubic-bezier(0.22, 1, 0.36, 1);
+
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.24);
+}
+
+.wb-dark .wb-export-modal {
+  border-color: #35383d;
+  background: #202124;
+  color: #f5f6f7;
+}
+
+.wb-light .wb-export-modal {
+  border-color: #dce1e8;
+  background: #ffffff;
+  color: #20242a;
+
+  box-shadow:
+    0 18px 50px rgba(43, 52, 66, 0.16);
+}
+
+
+/* header */
+
+.wb-export-title {
+  color: inherit;
+}
+
+.wb-dark .wb-export-subtitle {
+  color: #9da3ad;
+}
+
+.wb-light .wb-export-subtitle {
+  color: #737b87;
+}
+
+.wb-export-close {
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.wb-dark .wb-export-close {
+  color: #aeb4bd;
+}
+
+.wb-dark .wb-export-close:hover {
+  background: #2c2e32;
+  color: #ffffff;
+}
+
+.wb-light .wb-export-close {
+  color: #6c7480;
+}
+
+.wb-light .wb-export-close:hover {
+  background: #f0f2f5;
+  color: #20242a;
+}
+
+
+/* segmented tabs */
+
+.wb-dark .wb-export-tabs {
+  background: #18191b;
+}
+
+.wb-light .wb-export-tabs {
+  background: #f0f2f5;
+}
+
+.wb-export-tab {
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.wb-dark .wb-export-tab {
+  color: #858c96;
+}
+
+.wb-dark .wb-export-tab:hover {
+  color: #d8dce2;
+}
+
+.wb-dark .wb-export-tab--active {
+  background: #2a2c30;
+  color: #f8f9fa;
+
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+.wb-light .wb-export-tab {
+  color: #717986;
+}
+
+.wb-light .wb-export-tab:hover {
+  color: #303640;
+}
+
+.wb-light .wb-export-tab--active {
+  background: #ffffff;
+  color: #252a31;
+
+  box-shadow:
+    0 1px 3px rgba(40, 50, 65, 0.12);
+}
+
+
+/* format rows */
+
+.wb-export-row {
+  display: flex;
+
+  min-height: 54px;
+
+  align-items: center;
+  gap: 11px;
+
+  width: 100%;
+
+  border: 1px solid;
+  border-radius: 9px;
+
+  padding: 8px 10px;
+
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    transform 140ms ease;
+}
+
+.wb-export-row:active {
+  transform: translateY(1px);
+}
+
+.wb-dark .wb-export-row {
+  border-color: #34373c;
+  background: #242629;
+}
+
+.wb-dark .wb-export-row:hover {
+  border-color: #464a51;
+  background: #292b2f;
+}
+
+.wb-light .wb-export-row {
+  border-color: #e1e5ea;
+  background: #fbfcfd;
+}
+
+.wb-light .wb-export-row:hover {
+  border-color: #cfd6df;
+  background: #f6f8fa;
+}
+
+
+/* format badge */
+
+.wb-export-format {
+  display: flex;
+
+  width: 38px;
+  height: 32px;
+
+  flex: 0 0 auto;
+
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid;
+  border-radius: 7px;
+
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.wb-dark .wb-export-format {
+  border-color: #41454b;
+  background: #303236;
+  color: #cbd0d7;
+}
+
+.wb-light .wb-export-format {
+  border-color: #d9dfe7;
+  background: #eef2f6;
+  color: #505966;
+}
+
+
+/* row typography */
+
+.wb-export-row-title {
+  display: block;
+
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 17px;
+}
+
+.wb-dark .wb-export-row-title {
+  color: #f2f3f5;
+}
+
+.wb-light .wb-export-row-title {
+  color: #292f37;
+}
+
+.wb-export-row-copy {
+  display: block;
+
+  margin-top: 1px;
+
+  font-size: 10.5px;
+  line-height: 15px;
+}
+
+.wb-dark .wb-export-row-copy {
+  color: #8f969f;
+}
+
+.wb-light .wb-export-row-copy {
+  color: #7c8591;
+}
+
+
+/* recommended */
+
+.wb-export-recommended {
+  display: inline-flex;
+
+  align-items: center;
+
+  border-radius: 999px;
+
+  padding: 1px 6px;
+
+  font-size: 8.5px;
+  font-weight: 600;
+  line-height: 15px;
+}
+
+.wb-dark .wb-export-recommended {
+  background: rgba(111, 143, 239, 0.16);
+  color: #aabcf7;
+}
+
+.wb-light .wb-export-recommended {
+  background: #edf2ff;
+  color: #506ecb;
+}
+
+
+/* right side */
+
+.wb-export-row-icon {
+  flex: 0 0 auto;
+
+  transition:
+    transform 140ms ease,
+    color 140ms ease;
+}
+
+.wb-export-row:hover .wb-export-row-icon {
+  transform: translateX(2px);
+}
+
+.wb-dark .wb-export-row-icon {
+  color: #737b86;
+}
+
+.wb-light .wb-export-row-icon {
+  color: #8a939f;
+}
+
+.wb-export-create-link {
+  display: inline-flex;
+
+  flex: 0 0 auto;
+
+  align-items: center;
+  gap: 5px;
+
+  font-size: 9.5px;
+  font-weight: 500;
+}
+
+.wb-dark .wb-export-create-link {
+  color: #aabcf7;
+}
+
+.wb-light .wb-export-create-link {
+  color: #526fc9;
+}
+
+
+/* accessibility */
+
+.wb-export-close:focus-visible,
+.wb-export-tab:focus-visible,
+.wb-export-row:focus-visible {
+  outline: 2px solid #6f8fef;
+  outline-offset: 2px;
+}
+
+
+/* motion */
+
+@keyframes wb-export-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes wb-export-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wb-export-backdrop,
+  .wb-export-modal,
+  .wb-export-row,
+  .wb-export-row-icon {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* END PREMIUM EXPORT MODAL */
+
+/* Canvas-only soft ecru */
+.wb-light .wb-canvas {
+  background-color: #F2ECE1 !important;
+}
+
+/* =========================================================
+   People / presence modal
+   ========================================================= */
+
+[data-people-trigger="true"] {
+  cursor: pointer;
+}
+
+[data-people-trigger="true"]:focus-visible {
+  outline: 2px solid #6f8fef;
+  outline-offset: 2px;
+}
+
+
+/* modal */
+
+.wb-people-backdrop {
+  animation:
+    wb-people-backdrop-in 140ms ease-out;
+}
+
+.wb-people-modal {
+  animation:
+    wb-people-modal-in 160ms
+    cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wb-dark .wb-people-modal {
+  border-color: #35383d;
+  background: #202124;
+  color: #f5f6f7;
+
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.26);
+}
+
+.wb-light .wb-people-modal {
+  border-color: #dcdfe4;
+  background: #ffffff;
+  color: #252a31;
+
+  box-shadow:
+    0 18px 50px rgba(52, 59, 70, 0.16);
+}
+
+.wb-dark .wb-people-subtitle,
+.wb-dark .wb-people-note {
+  color: #9299a3;
+}
+
+.wb-light .wb-people-subtitle,
+.wb-light .wb-people-note {
+  color: #7d8590;
+}
+
+
+/* close */
+
+.wb-people-close {
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.wb-dark .wb-people-close {
+  color: #aeb4bd;
+}
+
+.wb-dark .wb-people-close:hover {
+  background: #2c2e32;
+  color: #ffffff;
+}
+
+.wb-light .wb-people-close {
+  color: #737b87;
+}
+
+.wb-light .wb-people-close:hover {
+  background: #f0f2f5;
+  color: #252a31;
+}
+
+
+/* participant rows */
+
+.wb-person-row {
+  transition: background-color 130ms ease;
+}
+
+.wb-dark .wb-person-row:hover {
+  background: #27292d;
+}
+
+.wb-light .wb-person-row:hover {
+  background: #f5f6f8;
+}
+
+.wb-person-avatar {
+  box-shadow:
+    inset 0 0 0 1px
+    rgba(255, 255, 255, 0.16);
+}
+
+.wb-dark .wb-person-name {
+  color: #f1f3f5;
+}
+
+.wb-light .wb-person-name {
+  color: #292f37;
+}
+
+.wb-dark .wb-person-you {
+  color: #818994;
+}
+
+.wb-light .wb-person-you {
+  color: #9299a3;
+}
+
+.wb-dark .wb-person-role {
+  color: #8f969f;
+}
+
+.wb-light .wb-person-role {
+  color: #7e8793;
+}
+
+.wb-dark .wb-person-role--host {
+  color: #f0e6ce;
+}
+
+.wb-light .wb-person-role--host {
+  color: #3e4650;
+}
+
+
+/* three-dot menu trigger */
+
+.wb-person-menu-trigger {
+  transition:
+    color 130ms ease,
+    background-color 130ms ease;
+}
+
+.wb-dark .wb-person-menu-trigger {
+  color: #8c939d;
+}
+
+.wb-dark .wb-person-menu-trigger:hover,
+.wb-dark .wb-person-menu-trigger[aria-expanded="true"] {
+  background: #34363b;
+  color: #ffffff;
+}
+
+.wb-light .wb-person-menu-trigger {
+  color: #818a96;
+}
+
+.wb-light .wb-person-menu-trigger:hover,
+.wb-light .wb-person-menu-trigger[aria-expanded="true"] {
+  background: #e9ecf0;
+  color: #252a31;
+}
+
+
+/* menu */
+
+.wb-dark .wb-person-menu {
+  border-color: #3b3e43;
+  background: #242629;
+
+  box-shadow:
+    0 7px 18px rgba(0, 0, 0, 0.28);
+}
+
+.wb-light .wb-person-menu {
+  border-color: #dfe3e8;
+  background: #ffffff;
+
+  box-shadow:
+    0 7px 18px rgba(53, 61, 72, 0.14);
+}
+
+.wb-person-menu-item {
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.wb-dark .wb-person-menu-item {
+  color: #dde0e5;
+}
+
+.wb-dark .wb-person-menu-item:hover:not(:disabled) {
+  background: #303338;
+}
+
+.wb-light .wb-person-menu-item {
+  color: #343a43;
+}
+
+.wb-light .wb-person-menu-item:hover:not(:disabled) {
+  background: #f0f2f5;
+}
+
+.wb-person-menu-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.wb-dark
+.wb-person-menu-item--danger:not(:disabled) {
+  color: #ef8d8d;
+}
+
+.wb-light
+.wb-person-menu-item--danger:not(:disabled) {
+  color: #c74f4f;
+}
+
+.wb-dark
+.wb-person-menu-item--danger:hover:not(:disabled) {
+  background: rgba(188, 65, 65, 0.12);
+}
+
+.wb-light
+.wb-person-menu-item--danger:hover:not(:disabled) {
+  background: #fff0f0;
+}
+
+
+/* removal screen */
+
+.wb-dark .wb-removed-screen {
+  background: #18191b;
+  color: #f5f6f7;
+}
+
+.wb-light .wb-removed-screen {
+  background: #f2ece1;
+  color: #252a31;
+}
+
+.wb-dark .wb-removed-card {
+  border-color: #36393e;
+  background: #202124;
+}
+
+.wb-light .wb-removed-card {
+  border-color: #dadde2;
+  background: #ffffff;
+}
+
+.wb-dark .wb-removed-copy {
+  color: #979ea8;
+}
+
+.wb-light .wb-removed-copy {
+  color: #747d89;
+}
+
+.wb-removed-home {
+  border: 1px solid transparent;
+
+  transition:
+    background-color 130ms ease,
+    border-color 130ms ease;
+}
+
+.wb-dark .wb-removed-home {
+  border-color: #3b3e43;
+  background: #2b2d31;
+  color: #f5f6f7;
+}
+
+.wb-dark .wb-removed-home:hover {
+  background: #33363b;
+}
+
+.wb-light .wb-removed-home {
+  border-color: #d9dde3;
+  background: #f4f5f7;
+  color: #303640;
+}
+
+.wb-light .wb-removed-home:hover {
+  background: #ebeef2;
+}
+
+
+/* accessibility */
+
+.wb-people-close:focus-visible,
+.wb-person-menu-trigger:focus-visible,
+.wb-person-menu-item:focus-visible,
+.wb-removed-home:focus-visible {
+  outline: 2px solid #6f8fef;
+  outline-offset: 2px;
+}
+
+
+/* animation */
+
+@keyframes wb-people-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes wb-people-modal-in {
+  from {
+    opacity: 0;
+    transform:
+      translateY(5px)
+      scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform:
+      translateY(0)
+      scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wb-people-backdrop,
+  .wb-people-modal,
+  .wb-person-row {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* END PEOPLE / PRESENCE MODAL */
+
+/* =========================================================
+   People typography normalization
+   ========================================================= */
+
+.wb-person-name,
+.wb-person-role,
+.wb-person-menu-item {
+  font-size: 12px !important;
+  line-height: 16px !important;
+}
+
+.wb-person-name {
+  font-weight: 500 !important;
+}
+
+.wb-person-role--host {
+  font-weight: 600 !important;
+}
+
+.wb-person-menu-item {
+  font-weight: 500 !important;
+}
+
+/* END PEOPLE TYPOGRAPHY NORMALIZATION */

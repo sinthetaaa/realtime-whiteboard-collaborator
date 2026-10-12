@@ -65,10 +65,10 @@ export async function GET(
         'Cache-Control': 'no-store',
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('GET /boards error', err);
     return NextResponse.json(
-      { ok: false, error: 'SERVER_ERROR', message: String(err?.message ?? err) },
+      { ok: false, error: 'SERVER_ERROR', message: err instanceof Error ? err.message : String(err) },
       { status: 500 }
     );
   }
@@ -96,10 +96,10 @@ export async function POST(
       size: bytes.byteLength,
       storage: hasRedis ? 'redis' : 'memory',
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('POST /boards error', err);
     return NextResponse.json(
-      { ok: false, error: 'SERVER_ERROR', message: String(err?.message ?? err) },
+      { ok: false, error: 'SERVER_ERROR', message: err instanceof Error ? err.message : String(err) },
       { status: 500 }
     );
   }
@@ -114,10 +114,10 @@ export async function DELETE(
     const decoded = decodeURIComponent(roomId);
     await deleteBoard(decoded);
     return NextResponse.json({ ok: true, roomId: decoded });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('DELETE /boards error', err);
     return NextResponse.json(
-      { ok: false, error: 'SERVER_ERROR', message: String(err?.message ?? err) },
+      { ok: false, error: 'SERVER_ERROR', message: err instanceof Error ? err.message : String(err) },
       { status: 500 }
     );
   }

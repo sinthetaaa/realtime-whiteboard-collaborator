@@ -12,12 +12,12 @@
     "@hocuspocus/provider": "^3.2.4",
     "@upstash/redis": "^1.35.5",
     "konva": "^10.0.2",
-    "nanoid": "^5.1.6",
-    "next": "15.5.4",
+    "lucide-react": "^1.55.0",
+    "nanoid": "^5.1.16",
+    "next": "15.5.27",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-konva": "^19.0.10",
-    "y-websocket": "^3.0.0",
     "yjs": "^13.6.27",
     "zustand": "^5.0.8"
   },
@@ -28,8 +28,17 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.5.4",
+    "eslint-config-next": "15.5.27",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "pnpm": {
+    "overrides": {
+      "ws": "8.22.0",
+      "postcss": "8.5.23",
+      "source-map-js": "1.2.2",
+      "sharp": "0.35.5",
+      "nanoid@<4": "3.3.18"
+    }
   }
 }
