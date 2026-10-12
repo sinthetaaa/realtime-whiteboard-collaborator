@@ -57,7 +57,7 @@ export async function GET(
       return new NextResponse('Not found', { status: 404 });
     }
 
-    return new NextResponse(bytes, {
+    return new NextResponse(Buffer.from(bytes), {
       headers: {
         'Content-Type': 'application/octet-stream',
         'Content-Disposition': `attachment; filename="${decoded}"`,

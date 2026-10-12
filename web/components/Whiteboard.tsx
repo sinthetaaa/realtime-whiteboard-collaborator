@@ -222,14 +222,14 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
     setName(stored);
     setAskName(!stored);
 
-    provider.awareness.setLocalStateField('cursor', { x: null, y: null });
-    provider.awareness.setLocalStateField('name', stored || 'Guest');
-    provider.awareness.setLocalStateField('color', color);
+    provider.awareness?.setLocalStateField('cursor', { x: null, y: null });
+    provider.awareness?.setLocalStateField('name', stored || 'Guest');
+    provider.awareness?.setLocalStateField('color', color);
 
     const handleAwarenessUpdate = () => {
       const map: Record<string, CursorState> = {};
-      const states = provider.awareness.getStates() as Map<number, any>;
-      states.forEach((st, id) => {
+      const states = provider.awareness?.getStates() as Map<number, any>;
+      states?.forEach((st, id) => {
         const c = st?.cursor;
         if (!c || c.x == null || c.y == null) return;
         map[String(id)] = {
@@ -241,15 +241,15 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
       setCursors(map);
     };
 
-    provider.awareness.on('update', handleAwarenessUpdate);
+    provider.awareness?.on('update', handleAwarenessUpdate);
     yRef.current = { doc, yStrokes, provider, yMessages };
 
     return () => {
-      try { provider.awareness.setLocalStateField('cursor', { x: null, y: null }); } catch {}
+      try { provider.awareness?.setLocalStateField('cursor', { x: null, y: null }); } catch {}
       yStrokes.unobserveDeep(syncStrokes);
       yShapes.unobserveDeep(syncShapes);
       yMessages.unobserveDeep(syncMessages);
-      provider.awareness.off('update', handleAwarenessUpdate);
+      provider.awareness?.off('update', handleAwarenessUpdate);
       provider.destroy();
       doc.destroy();
       yRef.current = null;
@@ -269,11 +269,11 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
   // keep presence color/name
   useEffect(() => {
     const prov = yRef.current?.provider;
-    if (prov) prov.awareness.setLocalStateField('color', color);
+    if (prov) prov.awareness?.setLocalStateField('color', color);
   }, [color]);
   useEffect(() => {
     const prov = yRef.current?.provider;
-    if (prov && name) prov.awareness.setLocalStateField('name', name);
+    if (prov && name) prov.awareness?.setLocalStateField('name', name);
   }, [name]);
 
   const saveName = () => {
@@ -281,7 +281,7 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
     const finalName = trimmed || 'Guest';
     try { localStorage.setItem('wb_name', finalName); } catch {}
     setName(finalName);
-    yRef.current?.provider?.awareness.setLocalStateField('name', finalName);
+    yRef.current?.provider?.awareness?.setLocalStateField('name', finalName);
     setAskName(false);
   };
 
@@ -455,7 +455,7 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
     const pos = stage.getPointerPosition();
 
     const prov = yRef.current?.provider;
-    if (prov && pos) prov.awareness.setLocalStateField('cursor', { x: pos.x, y: pos.y });
+    if (prov && pos) prov.awareness?.setLocalStateField('cursor', { x: pos.x, y: pos.y });
 
     if (!pos) return;
 
@@ -498,7 +498,7 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
 
   const onMouseLeave = () => {
     const prov = yRef.current?.provider;
-    if (prov) prov.awareness.setLocalStateField('cursor', { x: null, y: null });
+    if (prov) prov.awareness?.setLocalStateField('cursor', { x: null, y: null });
   };
 
   // --- keyboard: Undo/Redo + Delete + Duplicate + Nudge ---
