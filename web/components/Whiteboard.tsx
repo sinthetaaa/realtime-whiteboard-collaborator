@@ -340,6 +340,17 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>('connecting');
 
+  const [documentSynced, setDocumentSynced] =
+    useState(false);
+
+  const realtimeReady =
+    connectionStatus === 'connected' &&
+    documentSynced;
+
+  const canMutateBoard =
+    realtimeReady &&
+    !removedFromBoard;
+
   const [shareOpen, setShareOpen] = useState(false);
   const [shareLink, setShareLink] = useState('');
   const [copiedShareLink, setCopiedShareLink] = useState(false);
@@ -544,6 +555,10 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
   }, [isEditingBoardTitle]);
 
   const beginBoardTitleEdit = () => {
+    if (!canMutateBoard) {
+      return;
+    }
+
     isEditingBoardTitleRef.current =
       true;
 
@@ -552,6 +567,21 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
   };
 
   const commitBoardTitle = () => {
+    if (!canMutateBoard) {
+      isEditingBoardTitleRef.current =
+        false;
+
+      setBoardTitleDraft(
+        boardTitle,
+      );
+
+      setIsEditingBoardTitle(
+        false,
+      );
+
+      return;
+    }
+
     const nextTitle =
       (
         boardTitleDraft.trim() ||
@@ -1394,6 +1424,13 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
       return;
     }
 
+    /*
+     * WebSocket transport readiness and Yjs document
+     * readiness are separate states. Never treat a
+     * connected socket as an already synchronized board.
+     */
+    setDocumentSynced(false);
+
     const stableUserId =
       localUserId;
 
@@ -1486,21 +1523,41 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
 
         onAuthenticationFailed:
           () => {
+            setDocumentSynced(
+              false,
+            );
+
             setConnectionStatus(
               'disconnected',
             );
           },
 
         onStatus: ({ status }) => {
-        if (
-          status === 'connecting' ||
-          status === 'connected' ||
-          status === 'disconnected'
-        ) {
-          setConnectionStatus(status);
-        }
-      },
-    });
+          if (
+            status === 'connecting' ||
+            status === 'connected' ||
+            status === 'disconnected'
+          ) {
+            setConnectionStatus(
+              status,
+            );
+
+            if (
+              status !== 'connected'
+            ) {
+              setDocumentSynced(
+                false,
+              );
+            }
+          }
+        },
+
+        onSynced: ({ state }) => {
+          setDocumentSynced(
+            state,
+          );
+        },
+      });
 
     const yStrokes = doc.getArray<WhiteboardYMap>('strokes');
     const yShapes  = doc.getArray<WhiteboardYMap>('shapes');
@@ -2017,7 +2074,12 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
 
   // --- helpers for selection actions (toolbar + keyboard) ---
   const deleteSelected = useCallback(() => {
-    if (!selectedShapeId) return;
+    if (
+      !canMutateBoard ||
+      !selectedShapeId
+    ) {
+      return;
+    }
     const exists = shapes.some(s => s.id === selectedShapeId);
     if (!exists) return;
 
@@ -2026,10 +2088,23 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
     setShapes(nextShapes);
     setSelectedShapeId(null);
     writeAllToY({ strokes, shapes: nextShapes });
-  }, [selectedShapeId, shapes, strokes, pushUndo, clearRedo, snapshot]);
+  }, [
+    canMutateBoard,
+    selectedShapeId,
+    shapes,
+    strokes,
+    pushUndo,
+    clearRedo,
+    snapshot,
+  ]);
 
   const duplicateSelected = useCallback(() => {
-    if (!selectedShapeId) return;
+    if (
+      !canMutateBoard ||
+      !selectedShapeId
+    ) {
+      return;
+    }
     const original = shapes.find(s => s.id === selectedShapeId);
     if (!original) return;
 
@@ -2043,10 +2118,19 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
     setShapes(nextShapes);
     setSelectedShapeId(clone.id);
     writeAllToY({ strokes, shapes: nextShapes });
-  }, [selectedShapeId, shapes, strokes, pushUndo, clearRedo, snapshot]);
+  }, [
+    canMutateBoard,
+    selectedShapeId,
+    shapes,
+    strokes,
+    pushUndo,
+    clearRedo,
+    snapshot,
+  ]);
 
   // --- interactions ---
   const onMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (!canMutateBoard) return;
     if (e?.evt?.button === 2) return;
 
     const clickedOnEmpty = e.target === e.target.getStage();
@@ -2168,6 +2252,12 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
   };
 
   const onMouseUp = () => {
+    if (!canMutateBoard) {
+      setDrawing(null);
+      setDraftShape(null);
+      return;
+    }
+
     if (draftShape) {
       pushUndo(snapshot()); clearRedo();
       let finalShape = draftShape;
@@ -2212,6 +2302,10 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
   // --- keyboard: Undo/Redo + Delete + Duplicate + Nudge ---
   useEffect(() => {
     const handleKeys = (e: KeyboardEvent) => {
+      if (!canMutateBoard) {
+        return;
+      }
+
       const tag = (document.activeElement?.tagName || '').toUpperCase();
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
@@ -2295,11 +2389,16 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
     deleteSelected,
     duplicateSelected,
     clearRedo,
+    canMutateBoard,
   ]);
 
   // Toolbar Undo/Redo + Duplicate/Delete events
   useEffect(() => {
     const doUndo = () => {
+      if (!canMutateBoard) {
+        return;
+      }
+
       const prev = popUndo();
       if (prev) {
         pushRedo(snapshot());
@@ -2309,6 +2408,10 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
       }
     };
     const doRedo = () => {
+      if (!canMutateBoard) {
+        return;
+      }
+
       const next = popRedo();
       if (next) {
         pushUndo(snapshot());
@@ -2335,11 +2438,24 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
       window.removeEventListener('wb-duplicate', onDuplicate);
       window.removeEventListener('wb-delete', onDelete);
     };
-  }, [snapshot, popUndo, pushRedo, popRedo, pushUndo, duplicateSelected, deleteSelected]);
+  }, [
+    snapshot,
+    popUndo,
+    pushRedo,
+    popRedo,
+    pushUndo,
+    duplicateSelected,
+    deleteSelected,
+    canMutateBoard,
+  ]);
 
   // Clear + Export
   useEffect(() => {
     const onClear = () => {
+      if (!canMutateBoard) {
+        return;
+      }
+
       pushUndo(snapshot());
       clearRedo();
 
@@ -2370,7 +2486,13 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
       window.removeEventListener('wb-clear', hClear);
       window.removeEventListener('wb-export', hExport);
     };
-  }, [roomId, snapshot, pushUndo, clearRedo]);
+  }, [
+    roomId,
+    snapshot,
+    pushUndo,
+    clearRedo,
+    canMutateBoard,
+  ]);
 
   // Attach transformer to selected (rect/ellipse/text)
   useEffect(() => {
@@ -2477,6 +2599,10 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
   }, [messages, chatOpen, name]);
 
   const sendChat = () => {
+    if (!canMutateBoard) {
+      return;
+    }
+
     const text = chatInput.trim();
     if (!text) return;
     const yMessages = yRef.current?.yMessages;
@@ -2507,7 +2633,14 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
   const stopEditingText = (commit: boolean) => {
     const id = editingTextId;
     setEditingTextId(null);
-    if (!commit || !id) return;
+
+    if (
+      !commit ||
+      !id ||
+      !canMutateBoard
+    ) {
+      return;
+    }
     const ta = textareaRef.current;
     if (!ta) return;
     const val = (ta.value ?? '').trimEnd();
@@ -2949,11 +3082,13 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
       >
         <div
           title={
-            connectionStatus === 'connected'
-              ? 'Connected'
-              : connectionStatus === 'connecting'
-                ? 'Connecting'
-                : 'Disconnected'
+            realtimeReady
+              ? 'Connected and synced'
+              : connectionStatus === 'connected'
+                ? 'Connected, syncing board'
+                : connectionStatus === 'connecting'
+                  ? 'Connecting'
+                  : 'Disconnected'
           }
           className="
             wb-live wb-surface flex h-8 items-center gap-1.5
@@ -2966,9 +3101,10 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
           <span
             aria-hidden="true"
             className={`h-1.5 w-1.5 rounded-full ${
-              connectionStatus === 'connected'
+              realtimeReady
                 ? 'bg-[#22c55e]'
-                : connectionStatus === 'connecting'
+                : connectionStatus === 'connecting' ||
+                    connectionStatus === 'connected'
                   ? 'bg-[#f59e0b]'
                   : 'bg-[#ef4444]'
             }`}
@@ -2981,11 +3117,13 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
               xl:inline
             "
           >
-            {connectionStatus === 'connected'
+            {realtimeReady
               ? 'Live'
-              : connectionStatus === 'connecting'
-                ? 'Connecting'
-                : 'Offline'}
+              : connectionStatus === 'connected'
+                ? 'Syncing'
+                : connectionStatus === 'connecting'
+                  ? 'Connecting'
+                  : 'Offline'}
           </span>
         </div>
 
@@ -4318,17 +4456,22 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
           ref={stageRef}
           width={size.w}
           height={size.h}
+          listening={canMutateBoard}
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
           onMouseLeave={onMouseLeave}
           style={{
             cursor:
-              tool === 'shape'
-                ? 'crosshair'
-                : tool === 'text'
-                  ? 'text'
-                  : 'default',
+              !canMutateBoard
+                ? connectionStatus === 'disconnected'
+                  ? 'not-allowed'
+                  : 'wait'
+                : tool === 'shape'
+                  ? 'crosshair'
+                  : tool === 'text'
+                    ? 'text'
+                    : 'default',
           }}
         >
           {/* strokes */}
@@ -5213,6 +5356,7 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
                 >
                   <textarea
                     value={chatInput}
+                    disabled={!canMutateBoard}
                     onChange={(e) =>
                       setChatInput(e.target.value)
                     }
@@ -5252,7 +5396,10 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
                     aria-label="Send message"
                     title="Send"
                     onClick={sendChat}
-                    disabled={!chatInput.trim()}
+                    disabled={
+                      !canMutateBoard ||
+                      !chatInput.trim()
+                    }
                     className="
                       flex h-7 w-7 shrink-0
                       items-center justify-center
