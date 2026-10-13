@@ -23,6 +23,80 @@ import {
 
 import styles from './home.module.css';
 
+
+type HomepagePresenceRoom = {
+  roomId: string;
+  online: boolean;
+  activeCount: number;
+  activeUserIds: string[];
+};
+
+
+const HOMEPAGE_PRESENCE_REFRESH_MS =
+  5_000;
+
+
+const isRecord = (
+  value: unknown,
+): value is Record<
+  string,
+  unknown
+> =>
+  typeof value ===
+    'object' &&
+  value !== null &&
+  !Array.isArray(
+    value,
+  );
+
+
+const isHomepagePresenceRoom = (
+  value: unknown,
+): value is HomepagePresenceRoom => {
+  if (
+    !isRecord(
+      value,
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    typeof value.roomId !==
+      'string' ||
+    typeof value.online !==
+      'boolean' ||
+    typeof value.activeCount !==
+      'number' ||
+    !Number.isInteger(
+      value.activeCount,
+    ) ||
+    value.activeCount < 0 ||
+    !Array.isArray(
+      value.activeUserIds,
+    ) ||
+    !value.activeUserIds.every(
+      (userId) =>
+        typeof userId ===
+          'string' &&
+        userId.length > 0,
+    )
+  ) {
+    return false;
+  }
+
+  return (
+    value.activeCount ===
+      value.activeUserIds.length &&
+    value.online ===
+      (
+        value.activeCount >
+        0
+      )
+  );
+};
+
+
 const initialsFor = (
   name: string,
 ) => {
@@ -124,6 +198,17 @@ export default function Home() {
   const [now, setNow] =
     useState(0);
 
+  const [
+    presenceByRoom,
+    setPresenceByRoom,
+  ] =
+    useState<
+      Record<
+        string,
+        HomepagePresenceRoom
+      >
+    >({});
+
   useEffect(() => {
     const loadBoards = () => {
       setBoards(
@@ -183,6 +268,247 @@ export default function Home() {
       );
     };
   }, []);
+
+
+  useEffect(() => {
+    const roomIds =
+      Array.from(
+        new Set(
+          boards.map(
+            (board) =>
+              board.roomId,
+          ),
+        ),
+      ).slice(
+        0,
+        30,
+      );
+
+    if (
+      roomIds.length === 0
+    ) {
+      setPresenceByRoom({});
+      return;
+    }
+
+    let cancelled =
+      false;
+
+    let requestRunning =
+      false;
+
+
+    const requestPresence =
+      () =>
+        fetch(
+          '/api/boards/presence',
+          {
+            method:
+              'POST',
+
+            credentials:
+              'same-origin',
+
+            cache:
+              'no-store',
+
+            headers: {
+              'Content-Type':
+                'application/json',
+            },
+
+            body:
+              JSON.stringify({
+                roomIds,
+              }),
+          },
+        );
+
+
+    const refreshPresence =
+      async () => {
+        if (
+          requestRunning ||
+          cancelled
+        ) {
+          return;
+        }
+
+        requestRunning =
+          true;
+
+        try {
+          let response =
+            await requestPresence();
+
+          /*
+           * wb_boards can outlive the signed session
+           * cookie. Re-establish an anonymous server
+           * identity once if the presence lookup says
+           * this browser is no longer authenticated.
+           */
+          if (
+            response.status ===
+            401
+          ) {
+            const sessionResponse =
+              await fetch(
+                '/api/auth/session',
+                {
+                  method:
+                    'POST',
+
+                  credentials:
+                    'same-origin',
+
+                  cache:
+                    'no-store',
+                },
+              );
+
+            if (
+              !sessionResponse.ok
+            ) {
+              throw new Error(
+                'SESSION_BOOTSTRAP_FAILED',
+              );
+            }
+
+            response =
+              await requestPresence();
+          }
+
+          if (
+            !response.ok
+          ) {
+            throw new Error(
+              'PRESENCE_LOOKUP_FAILED',
+            );
+          }
+
+          const payload:
+            unknown =
+            await response.json();
+
+          if (
+            !isRecord(
+              payload,
+            ) ||
+            payload.ok !==
+              true ||
+            !Array.isArray(
+              payload.rooms,
+            ) ||
+            !payload.rooms.every(
+              isHomepagePresenceRoom,
+            )
+          ) {
+            throw new Error(
+              'PRESENCE_RESPONSE_INVALID',
+            );
+          }
+
+          const rooms =
+            payload.rooms as
+              HomepagePresenceRoom[];
+
+          const nextPresence:
+            Record<
+              string,
+              HomepagePresenceRoom
+            > = {};
+
+          for (
+            const room
+            of rooms
+          ) {
+            nextPresence[
+              room.roomId
+            ] =
+              room;
+          }
+
+          if (!cancelled) {
+            setPresenceByRoom(
+              nextPresence,
+            );
+          }
+        } catch {
+          /*
+           * Never infer "online" from stale browser
+           * activity when authoritative presence is
+           * unavailable. Fail closed to offline.
+           */
+          if (!cancelled) {
+            setPresenceByRoom({});
+          }
+        } finally {
+          requestRunning =
+            false;
+        }
+      };
+
+
+    const handleFocus =
+      () => {
+        void refreshPresence();
+      };
+
+
+    const handleVisibilityChange =
+      () => {
+        if (
+          document.visibilityState ===
+          'visible'
+        ) {
+          void refreshPresence();
+        }
+      };
+
+
+    void refreshPresence();
+
+
+    const timer =
+      window.setInterval(
+        () => {
+          void refreshPresence();
+        },
+        HOMEPAGE_PRESENCE_REFRESH_MS,
+      );
+
+
+    window.addEventListener(
+      'focus',
+      handleFocus,
+    );
+
+    document.addEventListener(
+      'visibilitychange',
+      handleVisibilityChange,
+    );
+
+
+    return () => {
+      cancelled =
+        true;
+
+      window.clearInterval(
+        timer,
+      );
+
+      window.removeEventListener(
+        'focus',
+        handleFocus,
+      );
+
+      document.removeEventListener(
+        'visibilitychange',
+        handleVisibilityChange,
+      );
+    };
+  }, [boards]);
+
 
   const sortedBoards =
     useMemo(
@@ -576,23 +902,61 @@ export default function Home() {
                 <tbody>
                   {sortedBoards.map(
                     (board) => {
+                      const presence =
+                        presenceByRoom[
+                          board.roomId
+                        ];
+
                       const online =
                         Boolean(
-                          now &&
-                          now -
-                            board.lastActiveAt <
-                            15000,
+                          presence?.online,
                         );
+
+                      const activeUserIds =
+                        new Set(
+                          presence
+                            ?.activeUserIds ??
+                            [],
+                        );
+
+                      /*
+                       * Redis intentionally stores trusted
+                       * authenticated IDs only.
+                       *
+                       * Names/colors remain browser-local
+                       * presentation metadata. Match active
+                       * IDs against that cached registry.
+                       * Unknown active users are represented
+                       * by the existing +N avatar.
+                       */
+                      const activeKnownPeople =
+                        online
+                          ? board.people.filter(
+                              (person) =>
+                                activeUserIds.has(
+                                  person.userId,
+                                ),
+                            )
+                          : [];
 
                       const people =
-                        board.people.slice(0, 3);
+                        activeKnownPeople.slice(
+                          0,
+                          3,
+                        );
 
                       const extraPeople =
-                        Math.max(
-                          0,
-                          board.people.length -
-                            people.length,
-                        );
+                        online
+                          ? Math.max(
+                              0,
+                              (
+                                presence
+                                  ?.activeCount ??
+                                0
+                              ) -
+                                people.length,
+                            )
+                          : 0;
 
                       return (
                         <tr
@@ -650,7 +1014,8 @@ export default function Home() {
 
                           <td>
                             <div className={styles.people}>
-                              {people.length === 0 ? (
+                              {people.length === 0 &&
+                              extraPeople === 0 ? (
                                 <span
                                   className={styles.noPeople}
                                 >

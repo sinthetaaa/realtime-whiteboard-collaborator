@@ -20,6 +20,12 @@ import {
   storePersistedYjsDocument,
 } from './documentPersistence';
 
+import {
+  PRESENCE_HEARTBEAT_INTERVAL_MS,
+  refreshBoardPresence,
+  removeBoardPresence,
+} from './presence';
+
 
 try {
   loadEnvFile(
@@ -146,6 +152,91 @@ const removeActiveConnection = (
     );
   }
 };
+
+
+const hasActiveUserConnections = (
+  roomId: string,
+  userId: string,
+) => {
+  const roomConnections =
+    activeConnections.get(
+      roomId,
+    );
+
+  const userConnections =
+    roomConnections?.get(
+      userId,
+    );
+
+  return Boolean(
+    userConnections &&
+    userConnections.size > 0,
+  );
+};
+
+
+let presenceHeartbeatRunning =
+  false;
+
+
+const refreshActivePresence =
+  async () => {
+    if (presenceHeartbeatRunning) {
+      return;
+    }
+
+    presenceHeartbeatRunning =
+      true;
+
+    try {
+      const seenAt =
+        Date.now();
+
+      const rooms =
+        Array.from(
+          activeConnections.entries(),
+        );
+
+      await Promise.all(
+        rooms.map(
+          async ([
+            roomId,
+            roomConnections,
+          ]) => {
+            const userIds =
+              Array.from(
+                roomConnections.keys(),
+              );
+
+            if (
+              userIds.length === 0
+            ) {
+              return;
+            }
+
+            await refreshBoardPresence(
+              roomId,
+              userIds,
+              seenAt,
+            );
+          },
+        ),
+      );
+    } catch (error: unknown) {
+      /*
+       * Presence should never take collaboration down.
+       * Redis/API availability is handled separately by
+       * the homepage presence read path.
+       */
+      console.error(
+        '[presence] heartbeat failed',
+        error,
+      );
+    } finally {
+      presenceHeartbeatRunning =
+        false;
+    }
+  };
 
 
 let enforcementRunning =
@@ -369,6 +460,26 @@ const server =
           connection,
         );
 
+        /*
+         * Authentication has already established the
+         * trusted room/user identity at this point.
+         * Presence is therefore written only by the
+         * realtime server, never by browser input.
+         */
+        void refreshBoardPresence(
+          documentName,
+          [
+            userId,
+          ],
+        ).catch(
+          (error: unknown) => {
+            console.error(
+              `[presence] connect refresh failed room=${documentName} user=${userId}`,
+              error,
+            );
+          },
+        );
+
         connection.onClose(
           () => {
             removeActiveConnection(
@@ -376,6 +487,36 @@ const server =
               userId,
               connection.socketId,
             );
+
+            /*
+             * A browser can have several realtime sockets
+             * for the same authenticated user. Remove the
+             * Redis member only after the final local
+             * connection has closed.
+             *
+             * Production currently uses one realtime
+             * replica. A multi-replica topology would need
+             * replica-aware presence before retaining this
+             * eager removal behavior.
+             */
+            if (
+              !hasActiveUserConnections(
+                documentName,
+                userId,
+              )
+            ) {
+              void removeBoardPresence(
+                documentName,
+                userId,
+              ).catch(
+                (error: unknown) => {
+                  console.error(
+                    `[presence] disconnect removal failed room=${documentName} user=${userId}`,
+                    error,
+                  );
+                },
+              );
+            }
           },
         );
       },
@@ -393,6 +534,17 @@ const enforcementTimer =
 enforcementTimer.unref();
 
 
+const presenceHeartbeatTimer =
+  setInterval(
+    () => {
+      void refreshActivePresence();
+    },
+    PRESENCE_HEARTBEAT_INTERVAL_MS,
+  );
+
+presenceHeartbeatTimer.unref();
+
+
 server
   .listen()
   .then(() => {
@@ -408,6 +560,10 @@ server
   .catch((error: unknown) => {
     clearInterval(
       enforcementTimer,
+    );
+
+    clearInterval(
+      presenceHeartbeatTimer,
     );
 
     console.error(
