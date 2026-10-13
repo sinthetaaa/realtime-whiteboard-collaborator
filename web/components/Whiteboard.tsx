@@ -369,6 +369,10 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
     useRef(false);
 
   useEffect(() => {
+    if (!localUserId) {
+      return;
+    }
+
     let cancelled = false;
 
     setBoardCreatedAt(null);
@@ -521,7 +525,10 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [roomId]);
+  }, [
+    roomId,
+    localUserId,
+  ]);
 
   useEffect(() => {
     if (!isEditingBoardTitle) return;
@@ -736,7 +743,101 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
 
 
   const localUserIdRef = useRef('');
-  const hostUserIdRef = useRef('');
+
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const controller =
+      new AbortController();
+
+    void (async () => {
+      try {
+        const response =
+          await fetch(
+            '/api/auth/session',
+            {
+              method: 'POST',
+              cache: 'no-store',
+              signal:
+                controller.signal,
+            },
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            `Session bootstrap failed: ${response.status}`,
+          );
+        }
+
+        const payload =
+          (await response.json()) as {
+            ok?: boolean;
+            userId?: string;
+          };
+
+        const authenticatedUserId =
+          payload.userId?.trim() ||
+          '';
+
+        if (
+          !payload.ok ||
+          !authenticatedUserId
+        ) {
+          throw new Error(
+            'Session bootstrap returned an invalid identity.',
+          );
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        localUserIdRef.current =
+          authenticatedUserId;
+
+        setLocalUserId(
+          authenticatedUserId,
+        );
+
+        /*
+         * Compatibility cache only.
+         * Authentication authority is the signed
+         * HttpOnly session cookie, never localStorage.
+         */
+        try {
+          window.localStorage.setItem(
+            'wb_user_id',
+            authenticatedUserId,
+          );
+        } catch {}
+      } catch (error) {
+        if (
+          cancelled ||
+          (
+            error instanceof DOMException &&
+            error.name === 'AbortError'
+          )
+        ) {
+          return;
+        }
+
+        console.error(
+          'Anonymous session bootstrap failed',
+          error,
+        );
+
+        setConnectionStatus(
+          'disconnected',
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, []);
 
 
   /** Chat state */
@@ -753,6 +854,255 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
     yMessages: Y.Array<WhiteboardYMap>;
     yMeta: Y.Map<string>;
   } | null>(null);
+
+
+  const applyCanonicalBoardAccess =
+    useCallback(
+      (
+        payload: {
+          hostUserId?: unknown;
+          removed?: unknown;
+        },
+      ) => {
+        const canonicalHostUserId =
+          typeof payload.hostUserId ===
+            'string'
+            ? payload.hostUserId.trim()
+            : '';
+
+        const removed =
+          payload.removed === true;
+
+        setHostUserId(
+          canonicalHostUserId,
+        );
+
+        setRemovedFromBoard(
+          removed,
+        );
+
+        if (removed) {
+          try {
+            yRef.current
+              ?.provider
+              .disconnect();
+          } catch {}
+        }
+      },
+      [],
+    );
+
+
+  const refreshBoardAccess =
+    useCallback(
+      async (
+        signal?: AbortSignal,
+      ) => {
+        if (!localUserId) {
+          return;
+        }
+
+        const endpoint =
+          `/api/boards/${encodeURIComponent(
+            roomId,
+          )}/access`;
+
+        const response =
+          await fetch(
+            endpoint,
+            {
+              cache:
+                'no-store',
+              signal,
+            },
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            `Board access request failed: ${response.status}`,
+          );
+        }
+
+        const payload =
+          (await response.json()) as {
+            ok?: boolean;
+            userId?: string;
+            hostUserId?: string | null;
+            removed?: boolean;
+            isHost?: boolean;
+          };
+
+        if (
+          !payload.ok ||
+          payload.userId !==
+            localUserId
+        ) {
+          throw new Error(
+            'Board access response was invalid.',
+          );
+        }
+
+        if (
+          payload.removed
+        ) {
+          applyCanonicalBoardAccess(
+            payload,
+          );
+
+          return;
+        }
+
+        /*
+         * Fresh rooms and pre-ACL development rooms
+         * have no trusted historical host record.
+         * First authenticated claimant wins atomically
+         * in Redis; subsequent claimants cannot steal it.
+         */
+        if (
+          !payload.hostUserId
+        ) {
+          const claimResponse =
+            await fetch(
+              endpoint,
+              {
+                method:
+                  'POST',
+
+                cache:
+                  'no-store',
+
+                headers: {
+                  'Content-Type':
+                    'application/json',
+                },
+
+                body:
+                  JSON.stringify({
+                    action:
+                      'claim-host',
+                  }),
+
+                signal,
+              },
+            );
+
+          const claimPayload =
+            (await claimResponse.json()) as {
+              ok?: boolean;
+              userId?: string;
+              hostUserId?: string | null;
+              removed?: boolean;
+              isHost?: boolean;
+              error?: string;
+            };
+
+          if (
+            claimResponse.status ===
+              403 &&
+            claimPayload.error ===
+              'REMOVED_FROM_BOARD'
+          ) {
+            applyCanonicalBoardAccess({
+              hostUserId:
+                claimPayload.hostUserId,
+              removed:
+                true,
+            });
+
+            return;
+          }
+
+          if (
+            !claimResponse.ok ||
+            !claimPayload.ok
+          ) {
+            throw new Error(
+              `Board host claim failed: ${claimResponse.status}`,
+            );
+          }
+
+          applyCanonicalBoardAccess(
+            claimPayload,
+          );
+
+          return;
+        }
+
+        applyCanonicalBoardAccess(
+          payload,
+        );
+      },
+      [
+        roomId,
+        localUserId,
+        applyCanonicalBoardAccess,
+      ],
+    );
+
+
+  useEffect(() => {
+    if (!localUserId) {
+      setHostUserId('');
+      setRemovedFromBoard(false);
+
+      return;
+    }
+
+    const controller =
+      new AbortController();
+
+    let stopped =
+      false;
+
+    const syncAccess =
+      async () => {
+        try {
+          await refreshBoardAccess(
+            controller.signal,
+          );
+        } catch (error) {
+          if (
+            stopped ||
+            (
+              error instanceof DOMException &&
+              error.name ===
+                'AbortError'
+            )
+          ) {
+            return;
+          }
+
+          console.error(
+            'Board access refresh failed',
+            error,
+          );
+        }
+      };
+
+    void syncAccess();
+
+    const interval =
+      window.setInterval(
+        () => {
+          void syncAccess();
+        },
+        2000,
+      );
+
+    return () => {
+      stopped = true;
+
+      controller.abort();
+
+      window.clearInterval(
+        interval,
+      );
+    };
+  }, [
+    localUserId,
+    refreshBoardAccess,
+  ]);
+
 
   const [
     persistenceReadyRoomId,
@@ -809,56 +1159,150 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
       localUserId === hostUserId,
     );
 
-  const makePersonHost = (
-    nextHostUserId: string,
-  ) => {
-    if (!canManagePeople) return;
-    if (!nextHostUserId) return;
+  const makePersonHost =
+    async (
+      nextHostUserId: string,
+    ) => {
+      if (!canManagePeople) return;
+      if (!nextHostUserId) return;
 
-    const meta =
-      yRef.current?.yMeta;
+      const response =
+        await fetch(
+          `/api/boards/${encodeURIComponent(
+            roomId,
+          )}/access`,
+          {
+            method:
+              'POST',
 
-    if (!meta) return;
+            cache:
+              'no-store',
 
-    meta.set(
-      'hostUserId',
-      nextHostUserId,
-    );
+            headers: {
+              'Content-Type':
+                'application/json',
+            },
 
-    hostUserIdRef.current =
-      nextHostUserId;
+            body:
+              JSON.stringify({
+                action:
+                  'transfer-host',
 
-    setHostUserId(
-      nextHostUserId,
-    );
+                targetUserId:
+                  nextHostUserId,
+              }),
+          },
+        );
 
-    setOpenPeopleMenuUserId(null);
-  };
+      const payload =
+        (await response.json()) as {
+          ok?: boolean;
+          hostUserId?: string | null;
+          error?: string;
+        };
 
-  const removePersonFromBoard = (
-    userId: string,
-  ) => {
-    if (!canManagePeople) return;
-    if (!userId) return;
+      if (
+        !response.ok ||
+        !payload.ok
+      ) {
+        /*
+         * A stale client may have lost host authority
+         * since rendering the People menu.
+         */
+        try {
+          await refreshBoardAccess();
+        } catch {}
 
-    /*
-     * The current host cannot remove themselves.
-     * Transfer host first if ownership needs to move.
-     */
-    if (userId === localUserId) return;
+        return;
+      }
 
-    const meta =
-      yRef.current?.yMeta;
+      setHostUserId(
+        payload.hostUserId?.trim() ||
+        '',
+      );
 
-    if (!meta) return;
+      setOpenPeopleMenuUserId(
+        null,
+      );
+    };
 
-    meta.set(
-      `removed:${userId}`,
-      String(Date.now()),
-    );
+  const removePersonFromBoard =
+    async (
+      userId: string,
+    ) => {
+      if (!canManagePeople) return;
+      if (!userId) return;
 
-    setOpenPeopleMenuUserId(null);
-  };
+      /*
+       * The current host cannot remove themselves.
+       * Transfer host first if ownership needs to move.
+       */
+      if (
+        userId ===
+        localUserId
+      ) {
+        return;
+      }
+
+      const response =
+        await fetch(
+          `/api/boards/${encodeURIComponent(
+            roomId,
+          )}/access`,
+          {
+            method:
+              'POST',
+
+            cache:
+              'no-store',
+
+            headers: {
+              'Content-Type':
+                'application/json',
+            },
+
+            body:
+              JSON.stringify({
+                action:
+                  'remove-user',
+
+                targetUserId:
+                  userId,
+              }),
+          },
+        );
+
+      const payload =
+        (await response.json()) as {
+          ok?: boolean;
+          hostUserId?: string | null;
+          error?: string;
+        };
+
+      if (
+        !response.ok ||
+        !payload.ok
+      ) {
+        try {
+          await refreshBoardAccess();
+        } catch {}
+
+        return;
+      }
+
+      if (
+        typeof payload.hostUserId ===
+          'string'
+      ) {
+        setHostUserId(
+          payload.hostUserId.trim(),
+        );
+      }
+
+      setOpenPeopleMenuUserId(
+        null,
+      );
+    };
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
@@ -946,12 +1390,108 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
 
   // Yjs + presence + chat setup
   useEffect(() => {
+    if (!localUserId) {
+      return;
+    }
+
+    const stableUserId =
+      localUserId;
+
+    localUserIdRef.current =
+      stableUserId;
+
     const doc = new Y.Doc();
-    const provider = new HocuspocusProvider({
-      url: process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:4000',
-      name: roomId,
-      document: doc,
-      onStatus: ({ status }) => {
+
+    const provider =
+      new HocuspocusProvider({
+        url:
+          process.env.NEXT_PUBLIC_WS_URL ||
+          'ws://localhost:4000',
+        name: roomId,
+        document: doc,
+
+        token: async () => {
+          const response =
+            await fetch(
+              `/api/auth/realtime-token?roomId=${encodeURIComponent(
+                roomId,
+              )}`,
+              {
+                cache:
+                  'no-store',
+              },
+            );
+
+          if (!response.ok) {
+            throw new Error(
+              `Realtime token request failed: ${response.status}`,
+            );
+          }
+
+          const payload =
+            (await response.json()) as {
+              ok?: boolean;
+              token?: string;
+              userId?: string;
+            };
+
+          const token =
+            payload.token?.trim() ||
+            '';
+
+          const tokenUserId =
+            payload.userId?.trim() ||
+            '';
+
+          if (
+            !payload.ok ||
+            !token ||
+            !tokenUserId
+          ) {
+            throw new Error(
+              'Realtime token response was invalid.',
+            );
+          }
+
+          /*
+           * Self-heal if the signed cookie identity
+           * changed between session bootstrap and a
+           * reconnect/token refresh.
+           */
+          if (
+            tokenUserId !==
+            stableUserId
+          ) {
+            localUserIdRef.current =
+              tokenUserId;
+
+            setLocalUserId(
+              tokenUserId,
+            );
+
+            try {
+              window.localStorage.setItem(
+                'wb_user_id',
+                tokenUserId,
+              );
+            } catch {}
+
+            throw new Error(
+              'Realtime identity changed; reconnecting with the authoritative session.',
+            );
+          }
+
+          return token;
+        },
+
+        onAuthenticationFailed:
+          () => {
+            setConnectionStatus(
+              'disconnected',
+            );
+          },
+
+        onStatus: ({ status }) => {
         if (
           status === 'connecting' ||
           status === 'connected' ||
@@ -1152,30 +1692,16 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
     // A joined room asks only on the first visit in this browser.
     setAskName(createdBoard || !stored);
 
-    let stableUserId = '';
-
+    /*
+     * Mirror the authenticated identity for legacy
+     * browser-local consumers only.
+     */
     try {
-      stableUserId =
-        localStorage.getItem('wb_user_id')?.trim() || '';
-
-      if (!stableUserId) {
-        stableUserId =
-          globalThis.crypto?.randomUUID?.() ||
-          nanoid();
-
-        localStorage.setItem(
-          'wb_user_id',
-          stableUserId,
-        );
-      }
-    } catch {
-      stableUserId =
-        globalThis.crypto?.randomUUID?.() ||
-        nanoid();
-    }
-
-    localUserIdRef.current = stableUserId;
-    setLocalUserId(stableUserId);
+      localStorage.setItem(
+        'wb_user_id',
+        stableUserId,
+      );
+    } catch {}
 
     const localAvatarColor =
       getPresenceAvatarColor(stableUserId);
@@ -1206,12 +1732,6 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
     );
 
     const syncBoardMeta = () => {
-      const nextHostUserId =
-        yMeta.get('hostUserId')?.trim() || '';
-
-      hostUserIdRef.current = nextHostUserId;
-      setHostUserId(nextHostUserId);
-
       const nextBoardTitle =
         yMeta
           .get('title')
@@ -1238,39 +1758,7 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
         );
       }
 
-      const removed =
-        Boolean(
-          yMeta.get(
-            `removed:${stableUserId}`,
-          ),
-        );
-
-      if (removed) {
-        setRemovedFromBoard(true);
-
-        try {
-          provider.disconnect();
-        } catch {}
-
-        window.setTimeout(() => {
-          try {
-            window.close();
-          } catch {}
-        }, 80);
-      }
     };
-
-    /*
-     * New boards naturally initialize with their creator.
-     * Legacy boards without metadata are claimed by the
-     * first connected client after this feature ships.
-     */
-    if (!yMeta.get('hostUserId')) {
-      yMeta.set(
-        'hostUserId',
-        stableUserId,
-      );
-    }
 
     syncBoardMeta();
     yMeta.observe(syncBoardMeta);
@@ -1379,7 +1867,10 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
 
       yRef.current = null;
     };
-  }, [roomId]);
+  }, [
+    roomId,
+    localUserId,
+  ]);
 
   // focus name modal input
   useEffect(() => {
@@ -2112,6 +2603,13 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
 
   // Save the logical board (strokes + shapes) to API
   const saveBoard = useCallback(async () => {
+    if (
+      !localUserId ||
+      removedFromBoard
+    ) {
+      return;
+    }
+
     try {
       const data = {
         version: 1,
@@ -2134,7 +2632,12 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
     } catch (e) {
       console.warn('Save failed', e);
     }
-  }, [roomId, snapshot]);
+  }, [
+    roomId,
+    snapshot,
+    localUserId,
+    removedFromBoard,
+  ]);
 
   // Debounced autosave whenever content changes
   useEffect(() => {

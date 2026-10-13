@@ -3,14 +3,25 @@ import {
   NextResponse,
 } from 'next/server';
 
-import { redis } from '../../../../../lib/redis';
+import {
+  authorizeBoardMutation,
+  isSameOriginMutation,
+} from '../../../../../lib/httpSecurity';
+
+import {
+  redis,
+} from '../../../../../lib/redis';
 
 import type {
   BoardMetadata,
 } from '../../../../../types/boardMetadata';
 
+
 const memory =
-  new Map<string, BoardMetadata>();
+  new Map<
+    string,
+    BoardMetadata
+  >();
 
 const hasRedis =
   Boolean(redis);
@@ -24,15 +35,25 @@ const DEFAULT_TITLE =
 const MAX_TITLE_LENGTH =
   120;
 
+const noStoreHeaders = {
+  'Cache-Control':
+    'no-store',
+};
+
+
 const metadataKeyOf = (
   roomId: string,
 ) =>
   `sayantika:whiteboard:v1:meta:${roomId}`;
 
+
 const normalizeTitle = (
   value: unknown,
 ) => {
-  if (typeof value !== 'string') {
+  if (
+    typeof value !==
+    'string'
+  ) {
     return DEFAULT_TITLE;
   }
 
@@ -49,22 +70,34 @@ const normalizeTitle = (
   );
 };
 
+
 const isRecord = (
   value: unknown,
-): value is Record<string, unknown> =>
-  typeof value === 'object' &&
+): value is Record<
+  string,
+  unknown
+> =>
+  typeof value ===
+    'object' &&
   value !== null &&
   !Array.isArray(value);
+
 
 const parseMetadata = (
   raw: unknown,
 ): BoardMetadata | null => {
-  let value = raw;
+  let value =
+    raw;
 
-  if (typeof value === 'string') {
+  if (
+    typeof value ===
+    'string'
+  ) {
     try {
       value =
-        JSON.parse(value);
+        JSON.parse(
+          value,
+        );
     } catch {
       return null;
     }
@@ -76,10 +109,14 @@ const parseMetadata = (
 
   if (
     value.version !== 1 ||
-    typeof value.roomId !== 'string' ||
-    typeof value.title !== 'string' ||
-    typeof value.createdAt !== 'number' ||
-    typeof value.updatedAt !== 'number'
+    typeof value.roomId !==
+      'string' ||
+    typeof value.title !==
+      'string' ||
+    typeof value.createdAt !==
+      'number' ||
+    typeof value.updatedAt !==
+      'number'
   ) {
     return null;
   }
@@ -97,64 +134,91 @@ const parseMetadata = (
   };
 };
 
-const loadMetadata = async (
-  roomId: string,
-): Promise<BoardMetadata | null> => {
-  if (hasRedis) {
-    const raw =
-      await redis!.get<unknown>(
-        metadataKeyOf(roomId),
+
+const loadMetadata =
+  async (
+    roomId: string,
+  ): Promise<
+    BoardMetadata | null
+  > => {
+    if (hasRedis) {
+      const raw =
+        await redis!.get<
+          unknown
+        >(
+          metadataKeyOf(
+            roomId,
+          ),
+        );
+
+      return parseMetadata(
+        raw,
       );
+    }
 
-    return parseMetadata(raw);
-  }
+    return (
+      memory.get(roomId) ??
+      null
+    );
+  };
 
-  return (
-    memory.get(roomId) ??
-    null
-  );
-};
 
 const createMetadataIfMissing =
   async (
     roomId: string,
     title: string,
   ): Promise<{
-    metadata: BoardMetadata;
-    created: boolean;
+    metadata:
+      BoardMetadata;
+    created:
+      boolean;
   }> => {
     const now =
       Date.now();
 
-    const candidate: BoardMetadata = {
-      version: 1,
-      roomId,
-      title,
-      createdAt: now,
-      updatedAt: now,
-    };
+    const candidate:
+      BoardMetadata = {
+        version: 1,
+        roomId,
+        title,
+        createdAt:
+          now,
+        updatedAt:
+          now,
+      };
 
     if (hasRedis) {
       const created =
         await redis!.set(
-          metadataKeyOf(roomId),
-          JSON.stringify(candidate),
+          metadataKeyOf(
+            roomId,
+          ),
+          JSON.stringify(
+            candidate,
+          ),
           {
             nx: true,
-            ex: METADATA_TTL_SECONDS,
+            ex:
+              METADATA_TTL_SECONDS,
           },
         );
 
-      if (created === 'OK') {
+      if (
+        created ===
+        'OK'
+      ) {
         return {
           metadata:
             candidate,
-          created: true,
+          created:
+            true,
         };
       }
 
       const existing =
-        await loadMetadata(roomId);
+        await loadMetadata(
+          roomId,
+        );
 
       if (!existing) {
         throw new Error(
@@ -165,18 +229,22 @@ const createMetadataIfMissing =
       return {
         metadata:
           existing,
-        created: false,
+        created:
+          false,
       };
     }
 
     const existing =
-      memory.get(roomId);
+      memory.get(
+        roomId,
+      );
 
     if (existing) {
       return {
         metadata:
           existing,
-        created: false,
+        created:
+          false,
       };
     }
 
@@ -188,40 +256,55 @@ const createMetadataIfMissing =
     return {
       metadata:
         candidate,
-      created: true,
+      created:
+        true,
     };
   };
+
 
 const updateMetadataTitle =
   async (
     roomId: string,
     title: string,
   ): Promise<{
-    metadata: BoardMetadata;
-    created: boolean;
+    metadata:
+      BoardMetadata;
+    created:
+      boolean;
   }> => {
     const existing =
-      await loadMetadata(roomId);
+      await loadMetadata(
+        roomId,
+      );
 
     const now =
       Date.now();
 
-    const next: BoardMetadata = {
-      version: 1,
-      roomId,
-      title,
-      createdAt:
-        existing?.createdAt ??
-        now,
-      updatedAt: now,
-    };
+    const next:
+      BoardMetadata = {
+        version: 1,
+        roomId,
+        title,
+
+        createdAt:
+          existing?.createdAt ??
+          now,
+
+        updatedAt:
+          now,
+      };
 
     if (hasRedis) {
       await redis!.set(
-        metadataKeyOf(roomId),
-        JSON.stringify(next),
+        metadataKeyOf(
+          roomId,
+        ),
+        JSON.stringify(
+          next,
+        ),
         {
-          ex: METADATA_TTL_SECONDS,
+          ex:
+            METADATA_TTL_SECONDS,
         },
       );
     } else {
@@ -232,40 +315,130 @@ const updateMetadataTitle =
     }
 
     return {
-      metadata: next,
+      metadata:
+        next,
+
       created:
         existing == null,
     };
   };
 
-const deleteMetadata = async (
-  roomId: string,
-) => {
-  if (hasRedis) {
-    await redis!.del(
-      metadataKeyOf(roomId),
+
+const deleteMetadata =
+  async (
+    roomId: string,
+  ) => {
+    if (hasRedis) {
+      await redis!.del(
+        metadataKeyOf(
+          roomId,
+        ),
+      );
+
+      return;
+    }
+
+    memory.delete(
+      roomId,
+    );
+  };
+
+
+const readRequestTitle =
+  async (
+    request: NextRequest,
+  ) => {
+    const body: unknown =
+      await request.json();
+
+    if (!isRecord(body)) {
+      return DEFAULT_TITLE;
+    }
+
+    return normalizeTitle(
+      body.title,
+    );
+  };
+
+
+const invalidOrigin =
+  () =>
+    NextResponse.json(
+      {
+        ok: false,
+        error:
+          'INVALID_ORIGIN',
+      },
+      {
+        status: 403,
+        headers:
+          noStoreHeaders,
+      },
     );
 
-    return;
-  }
 
-  memory.delete(roomId);
-};
+const authorizationFailure =
+  (
+    status:
+      Exclude<
+        Awaited<
+          ReturnType<
+            typeof authorizeBoardMutation
+          >
+        >['status'],
+        'OK'
+      >,
+  ) => {
+    if (
+      status ===
+      'UNAUTHENTICATED'
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            'UNAUTHENTICATED',
+        },
+        {
+          status: 401,
+          headers:
+            noStoreHeaders,
+        },
+      );
+    }
 
-const readRequestTitle = async (
-  request: NextRequest,
-) => {
-  const body: unknown =
-    await request.json();
+    if (
+      status ===
+      'REMOVED'
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            'REMOVED_FROM_BOARD',
+        },
+        {
+          status: 403,
+          headers:
+            noStoreHeaders,
+        },
+      );
+    }
 
-  if (!isRecord(body)) {
-    return DEFAULT_TITLE;
-  }
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          'HOST_REQUIRED',
+      },
+      {
+        status: 403,
+        headers:
+          noStoreHeaders,
+      },
+    );
+  };
 
-  return normalizeTitle(
-    body.title,
-  );
-};
 
 export async function GET(
   _request: NextRequest,
@@ -277,27 +450,40 @@ export async function GET(
   },
 ) {
   try {
-    const { roomId } =
+    const {
+      roomId,
+    } =
       await context.params;
 
     const decoded =
-      decodeURIComponent(roomId);
+      decodeURIComponent(
+        roomId,
+      );
 
     const metadata =
       await loadMetadata(
         decoded,
       );
 
-    return NextResponse.json({
-      ok: true,
-      exists:
-        metadata != null,
-      metadata,
-      storage:
-        hasRedis
-          ? 'redis'
-          : 'memory',
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+
+        exists:
+          metadata != null,
+
+        metadata,
+
+        storage:
+          hasRedis
+            ? 'redis'
+            : 'memory',
+      },
+      {
+        headers:
+          noStoreHeaders,
+      },
+    );
   } catch (error: unknown) {
     console.error(
       'GET board metadata error',
@@ -316,10 +502,13 @@ export async function GET(
       },
       {
         status: 500,
+        headers:
+          noStoreHeaders,
       },
     );
   }
 }
+
 
 export async function PUT(
   request: NextRequest,
@@ -331,11 +520,37 @@ export async function PUT(
   },
 ) {
   try {
-    const { roomId } =
+    if (
+      !isSameOriginMutation(
+        request,
+      )
+    ) {
+      return invalidOrigin();
+    }
+
+    const {
+      roomId,
+    } =
       await context.params;
 
     const decoded =
-      decodeURIComponent(roomId);
+      decodeURIComponent(
+        roomId,
+      );
+
+    const authorization =
+      await authorizeBoardMutation(
+        decoded,
+      );
+
+    if (
+      authorization.status !==
+      'OK'
+    ) {
+      return authorizationFailure(
+        authorization.status,
+      );
+    }
 
     const title =
       await readRequestTitle(
@@ -348,14 +563,21 @@ export async function PUT(
         title,
       );
 
-    return NextResponse.json({
-      ok: true,
-      ...result,
-      storage:
-        hasRedis
-          ? 'redis'
-          : 'memory',
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        ...result,
+
+        storage:
+          hasRedis
+            ? 'redis'
+            : 'memory',
+      },
+      {
+        headers:
+          noStoreHeaders,
+      },
+    );
   } catch (error: unknown) {
     console.error(
       'PUT board metadata error',
@@ -374,10 +596,13 @@ export async function PUT(
       },
       {
         status: 500,
+        headers:
+          noStoreHeaders,
       },
     );
   }
 }
+
 
 export async function PATCH(
   request: NextRequest,
@@ -389,11 +614,37 @@ export async function PATCH(
   },
 ) {
   try {
-    const { roomId } =
+    if (
+      !isSameOriginMutation(
+        request,
+      )
+    ) {
+      return invalidOrigin();
+    }
+
+    const {
+      roomId,
+    } =
       await context.params;
 
     const decoded =
-      decodeURIComponent(roomId);
+      decodeURIComponent(
+        roomId,
+      );
+
+    const authorization =
+      await authorizeBoardMutation(
+        decoded,
+      );
+
+    if (
+      authorization.status !==
+      'OK'
+    ) {
+      return authorizationFailure(
+        authorization.status,
+      );
+    }
 
     const title =
       await readRequestTitle(
@@ -406,14 +657,21 @@ export async function PATCH(
         title,
       );
 
-    return NextResponse.json({
-      ok: true,
-      ...result,
-      storage:
-        hasRedis
-          ? 'redis'
-          : 'memory',
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        ...result,
+
+        storage:
+          hasRedis
+            ? 'redis'
+            : 'memory',
+      },
+      {
+        headers:
+          noStoreHeaders,
+      },
+    );
   } catch (error: unknown) {
     console.error(
       'PATCH board metadata error',
@@ -432,13 +690,16 @@ export async function PATCH(
       },
       {
         status: 500,
+        headers:
+          noStoreHeaders,
       },
     );
   }
 }
 
+
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   context: {
     params:
       Promise<{
@@ -447,21 +708,57 @@ export async function DELETE(
   },
 ) {
   try {
-    const { roomId } =
+    if (
+      !isSameOriginMutation(
+        request,
+      )
+    ) {
+      return invalidOrigin();
+    }
+
+    const {
+      roomId,
+    } =
       await context.params;
 
     const decoded =
-      decodeURIComponent(roomId);
+      decodeURIComponent(
+        roomId,
+      );
+
+    const authorization =
+      await authorizeBoardMutation(
+        decoded,
+        {
+          requireHost:
+            true,
+        },
+      );
+
+    if (
+      authorization.status !==
+      'OK'
+    ) {
+      return authorizationFailure(
+        authorization.status,
+      );
+    }
 
     await deleteMetadata(
       decoded,
     );
 
-    return NextResponse.json({
-      ok: true,
-      roomId:
-        decoded,
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        roomId:
+          decoded,
+      },
+      {
+        headers:
+          noStoreHeaders,
+      },
+    );
   } catch (error: unknown) {
     console.error(
       'DELETE board metadata error',
@@ -480,6 +777,8 @@ export async function DELETE(
       },
       {
         status: 500,
+        headers:
+          noStoreHeaders,
       },
     );
   }

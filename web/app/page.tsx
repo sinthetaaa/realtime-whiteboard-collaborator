@@ -195,6 +195,167 @@ export default function Home() {
       [boards],
     );
 
+  const [
+
+    creatingBoard,
+
+    setCreatingBoard,
+
+  ] = useState(false);
+
+
+
+  const createBoard =
+
+    async () => {
+
+      if (creatingBoard) {
+
+        return;
+
+      }
+
+
+      setCreatingBoard(
+
+        true,
+
+      );
+
+
+      try {
+
+        const sessionResponse =
+
+          await fetch(
+
+            '/api/auth/session',
+
+            {
+
+              method:
+
+                'POST',
+
+              cache:
+
+                'no-store',
+
+            },
+
+          );
+
+
+        if (
+
+          !sessionResponse.ok
+
+        ) {
+
+          throw new Error(
+
+            `Session bootstrap failed: ${sessionResponse.status}`,
+
+          );
+
+        }
+
+
+        const createResponse =
+
+          await fetch(
+
+            '/api/boards',
+
+            {
+
+              method:
+
+                'POST',
+
+              cache:
+
+                'no-store',
+
+            },
+
+          );
+
+
+        const payload =
+
+          (await createResponse.json()) as {
+
+            ok?: boolean;
+
+            roomId?: string;
+
+          };
+
+
+        const roomId =
+
+          typeof payload.roomId ===
+
+            'string'
+
+            ? payload.roomId.trim()
+
+            : '';
+
+
+        if (
+
+          !createResponse.ok ||
+
+          !payload.ok ||
+
+          !roomId
+
+        ) {
+
+          throw new Error(
+
+            `Board creation failed: ${createResponse.status}`,
+
+          );
+
+        }
+
+
+        window.location.assign(
+
+          `/r/${encodeURIComponent(
+
+            roomId,
+
+          )}?created=1`,
+
+        );
+
+      } catch (error) {
+
+        console.error(
+
+          'Board creation failed',
+
+          error,
+
+        );
+
+
+        setCreatingBoard(
+
+          false,
+
+        );
+
+      }
+
+    };
+
+
+
   const joinBoard = (
     event: FormEvent,
   ) => {
@@ -268,6 +429,13 @@ export default function Home() {
             <Link
               href="/new"
               className={styles.primaryAction}
+              onClick={(event) => {
+                event.preventDefault();
+
+                void createBoard();
+              }}
+              aria-disabled={creatingBoard}
+              aria-busy={creatingBoard}
             >
               <Plus
                 aria-hidden="true"

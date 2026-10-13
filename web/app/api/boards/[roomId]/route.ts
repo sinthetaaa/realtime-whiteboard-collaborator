@@ -1,133 +1,545 @@
-// web/app/api/boards/[roomId]/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { redis } from '../../../../lib/redis';
+import {
+  NextRequest,
+  NextResponse,
+} from 'next/server';
 
-const memory = new Map<string, Uint8Array>();
-const hasRedis = !!redis;
+import {
+  authorizeBoardMutation,
+  isSameOriginMutation,
+} from '../../../../lib/httpSecurity';
 
-const keyOf = (roomId: string) =>
+import {
+  redis,
+} from '../../../../lib/redis';
+
+
+const memory =
+  new Map<
+    string,
+    Uint8Array
+  >();
+
+const hasRedis =
+  Boolean(redis);
+
+const BOARD_TTL_SECONDS =
+  60 * 60 * 24 * 7;
+
+const noStoreHeaders = {
+  'Cache-Control':
+    'no-store',
+};
+
+
+const keyOf = (
+  roomId: string,
+) =>
   `sayantika:whiteboard:v1:board:${roomId}`;
 
-async function loadBoard(roomId: string): Promise<Uint8Array | null> {
+
+async function loadBoard(
+  roomId: string,
+): Promise<
+  Uint8Array | null
+> {
   if (hasRedis) {
-    const b64 = await redis!.get<string>(keyOf(roomId));
-    if (!b64) return null;
-    const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const b64 =
+      await redis!.get<string>(
+        keyOf(roomId),
+      );
+
+    if (!b64) {
+      return null;
+    }
+
+    const bin =
+      Uint8Array.from(
+        atob(b64),
+        (character) =>
+          character.charCodeAt(
+            0,
+          ),
+      );
+
     return bin;
   }
-  return memory.get(roomId) ?? null;
+
+  return (
+    memory.get(roomId) ??
+    null
+  );
 }
 
-async function saveBoard(roomId: string, bytes: Uint8Array): Promise<void> {
+
+async function saveBoard(
+  roomId: string,
+  bytes: Uint8Array,
+): Promise<void> {
   if (hasRedis) {
-    const b64 = btoa(String.fromCharCode(...bytes));
-    await redis!.set(keyOf(roomId), b64, { ex: 60 * 60 * 24 * 7 });
+    const b64 =
+      btoa(
+        String.fromCharCode(
+          ...bytes,
+        ),
+      );
+
+    await redis!.set(
+      keyOf(roomId),
+      b64,
+      {
+        ex:
+          BOARD_TTL_SECONDS,
+      },
+    );
+
     return;
   }
-  memory.set(roomId, bytes);
+
+  memory.set(
+    roomId,
+    bytes,
+  );
 }
 
-async function deleteBoard(roomId: string) {
+
+async function deleteBoard(
+  roomId: string,
+) {
   if (hasRedis) {
-    await redis!.del(keyOf(roomId));
-  } else {
-    memory.delete(roomId);
+    await redis!.del(
+      keyOf(roomId),
+    );
+
+    return;
   }
+
+  memory.delete(
+    roomId,
+  );
 }
 
-/** ---------- Handlers (await ctx.params) ---------- */
+
+const invalidOrigin =
+  () =>
+    NextResponse.json(
+      {
+        ok: false,
+        error:
+          'INVALID_ORIGIN',
+      },
+      {
+        status: 403,
+        headers:
+          noStoreHeaders,
+      },
+    );
+
+
+const authorizationFailure =
+  (
+    status:
+      Exclude<
+        Awaited<
+          ReturnType<
+            typeof authorizeBoardMutation
+          >
+        >['status'],
+        'OK'
+      >,
+  ) => {
+    if (
+      status ===
+      'UNAUTHENTICATED'
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            'UNAUTHENTICATED',
+        },
+        {
+          status: 401,
+          headers:
+            noStoreHeaders,
+        },
+      );
+    }
+
+    if (
+      status ===
+      'REMOVED'
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            'REMOVED_FROM_BOARD',
+        },
+        {
+          status: 403,
+          headers:
+            noStoreHeaders,
+        },
+      );
+    }
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          'HOST_REQUIRED',
+      },
+      {
+        status: 403,
+        headers:
+          noStoreHeaders,
+      },
+    );
+  };
+
 
 export async function GET(
-  req: NextRequest,
-  ctx: { params: Promise<{ roomId: string }> }   // <- params is a Promise
+  request: NextRequest,
+  context: {
+    params:
+      Promise<{
+        roomId: string;
+      }>;
+  },
 ) {
   try {
-    const { roomId } = await ctx.params;          // <- await it
-    const decoded = decodeURIComponent(roomId);
-    const format = req.nextUrl.searchParams.get('format');
+    const {
+      roomId,
+    } =
+      await context.params;
 
-    const bytes = await loadBoard(decoded);
-    const exists = !!bytes;
-    const size = bytes?.byteLength ?? 0;
+    const decoded =
+      decodeURIComponent(
+        roomId,
+      );
 
-    if (format === 'json') {
-      return NextResponse.json({ ok: true, roomId: decoded, exists, size });
+    const format =
+      request.nextUrl
+        .searchParams
+        .get(
+          'format',
+        );
+
+    const bytes =
+      await loadBoard(
+        decoded,
+      );
+
+    const exists =
+      Boolean(bytes);
+
+    const size =
+      bytes?.byteLength ??
+      0;
+
+    if (
+      format ===
+      'json'
+    ) {
+      return NextResponse.json(
+        {
+          ok: true,
+          roomId:
+            decoded,
+          exists,
+          size,
+        },
+        {
+          headers:
+            noStoreHeaders,
+        },
+      );
     }
 
-    if (!exists) {
-      return new NextResponse('Not found', { status: 404 });
+    if (!bytes) {
+      return new NextResponse(
+        'Not found',
+        {
+          status: 404,
+          headers:
+            noStoreHeaders,
+        },
+      );
     }
 
-    return new NextResponse(Buffer.from(bytes), {
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="${decoded}"`,
-        'Content-Length': String(size),
-        'Cache-Control': 'no-store',
+    return new NextResponse(
+      Buffer.from(
+        bytes,
+      ),
+      {
+        headers: {
+          'Content-Type':
+            'application/octet-stream',
+
+          'Content-Disposition':
+            `attachment; filename="${decoded}"`,
+
+          'Content-Length':
+            String(size),
+
+          ...noStoreHeaders,
+        },
       },
-    });
-  } catch (err: unknown) {
-    console.error('GET /boards error', err);
+    );
+  } catch (error: unknown) {
+    console.error(
+      'GET /boards error',
+      error,
+    );
+
     return NextResponse.json(
-      { ok: false, error: 'SERVER_ERROR', message: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
+      {
+        ok: false,
+        error:
+          'SERVER_ERROR',
+        message:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+      {
+        status: 500,
+        headers:
+          noStoreHeaders,
+      },
     );
   }
 }
+
 
 export async function POST(
-  req: NextRequest,
-  ctx: { params: Promise<{ roomId: string }> }   // <- params is a Promise
+  request: NextRequest,
+  context: {
+    params:
+      Promise<{
+        roomId: string;
+      }>;
+  },
 ) {
   try {
-    const { roomId } = await ctx.params;          // <- await it
-    const decoded = decodeURIComponent(roomId);
-
-    const ab = await req.arrayBuffer();
-    const bytes = new Uint8Array(ab);
-
-    if (!bytes.byteLength) {
-      return NextResponse.json({ ok: false, error: 'EMPTY_BODY' }, { status: 400 });
+    if (
+      !isSameOriginMutation(
+        request,
+      )
+    ) {
+      return invalidOrigin();
     }
 
-    await saveBoard(decoded, bytes);
-    return NextResponse.json({
-      ok: true,
-      roomId: decoded,
-      size: bytes.byteLength,
-      storage: hasRedis ? 'redis' : 'memory',
-    });
-  } catch (err: unknown) {
-    console.error('POST /boards error', err);
+    const {
+      roomId,
+    } =
+      await context.params;
+
+    const decoded =
+      decodeURIComponent(
+        roomId,
+      );
+
+    const authorization =
+      await authorizeBoardMutation(
+        decoded,
+      );
+
+    if (
+      authorization.status !==
+      'OK'
+    ) {
+      return authorizationFailure(
+        authorization.status,
+      );
+    }
+
+    const arrayBuffer =
+      await request.arrayBuffer();
+
+    const bytes =
+      new Uint8Array(
+        arrayBuffer,
+      );
+
+    if (
+      !bytes.byteLength
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            'EMPTY_BODY',
+        },
+        {
+          status: 400,
+          headers:
+            noStoreHeaders,
+        },
+      );
+    }
+
+    await saveBoard(
+      decoded,
+      bytes,
+    );
+
     return NextResponse.json(
-      { ok: false, error: 'SERVER_ERROR', message: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
+      {
+        ok: true,
+        roomId:
+          decoded,
+        size:
+          bytes.byteLength,
+        storage:
+          hasRedis
+            ? 'redis'
+            : 'memory',
+      },
+      {
+        headers:
+          noStoreHeaders,
+      },
+    );
+  } catch (error: unknown) {
+    console.error(
+      'POST /boards error',
+      error,
+    );
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          'SERVER_ERROR',
+        message:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+      {
+        status: 500,
+        headers:
+          noStoreHeaders,
+      },
     );
   }
 }
+
 
 export async function DELETE(
-  _req: NextRequest,
-  ctx: { params: Promise<{ roomId: string }> }   // <- params is a Promise
+  request: NextRequest,
+  context: {
+    params:
+      Promise<{
+        roomId: string;
+      }>;
+  },
 ) {
   try {
-    const { roomId } = await ctx.params;          // <- await it
-    const decoded = decodeURIComponent(roomId);
-    await deleteBoard(decoded);
-    return NextResponse.json({ ok: true, roomId: decoded });
-  } catch (err: unknown) {
-    console.error('DELETE /boards error', err);
+    if (
+      !isSameOriginMutation(
+        request,
+      )
+    ) {
+      return invalidOrigin();
+    }
+
+    const {
+      roomId,
+    } =
+      await context.params;
+
+    const decoded =
+      decodeURIComponent(
+        roomId,
+      );
+
+    const authorization =
+      await authorizeBoardMutation(
+        decoded,
+        {
+          requireHost:
+            true,
+        },
+      );
+
+    if (
+      authorization.status !==
+      'OK'
+    ) {
+      return authorizationFailure(
+        authorization.status,
+      );
+    }
+
+    await deleteBoard(
+      decoded,
+    );
+
     return NextResponse.json(
-      { ok: false, error: 'SERVER_ERROR', message: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
+      {
+        ok: true,
+        roomId:
+          decoded,
+      },
+      {
+        headers:
+          noStoreHeaders,
+      },
+    );
+  } catch (error: unknown) {
+    console.error(
+      'DELETE /boards error',
+      error,
+    );
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          'SERVER_ERROR',
+        message:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+      {
+        status: 500,
+        headers:
+          noStoreHeaders,
+      },
     );
   }
 }
 
-/** Node-safe base64 helpers (since atob/btoa aren't in Node) */
-function atob(b64: string) {
-  return Buffer.from(b64, 'base64').toString('binary');
+
+/*
+ * Node-safe base64 helpers.
+ */
+function atob(
+  b64: string,
+) {
+  return Buffer
+    .from(
+      b64,
+      'base64',
+    )
+    .toString(
+      'binary',
+    );
 }
-function btoa(bin: string) {
-  return Buffer.from(bin, 'binary').toString('base64');
+
+
+function btoa(
+  binary: string,
+) {
+  return Buffer
+    .from(
+      binary,
+      'binary',
+    )
+    .toString(
+      'base64',
+    );
 }
