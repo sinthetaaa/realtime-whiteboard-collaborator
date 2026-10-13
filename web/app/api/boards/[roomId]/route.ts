@@ -5,7 +5,8 @@ import { redis } from '../../../../lib/redis';
 const memory = new Map<string, Uint8Array>();
 const hasRedis = !!redis;
 
-const keyOf = (roomId: string) => `wb:board:${roomId}`;
+const keyOf = (roomId: string) =>
+  `sayantika:whiteboard:v1:board:${roomId}`;
 
 async function loadBoard(roomId: string): Promise<Uint8Array | null> {
   if (hasRedis) {

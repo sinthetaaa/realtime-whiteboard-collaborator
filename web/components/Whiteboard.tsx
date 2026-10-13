@@ -539,6 +539,11 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
     yMeta: Y.Map<string>;
   } | null>(null);
 
+  const [
+    persistenceReadyRoomId,
+    setPersistenceReadyRoomId,
+  ] = useState<string | null>(null);
+
 
   const getPresentPeople = () => {
     const byUserId =
@@ -709,8 +714,6 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
 
 
   // --------- persistence helpers (NEW) ----------
-  const encode = (obj: unknown) =>
-    new TextEncoder().encode(JSON.stringify(obj));
   const decode = (ab: ArrayBuffer) =>
     JSON.parse(new TextDecoder().decode(new Uint8Array(ab)));
   // ---------------------------------------------
@@ -1867,51 +1870,122 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
   // --------- PERSISTENCE: save + restore (NEW) ----------
 
   // Save the logical board (strokes + shapes) to API
-  const saveBoard = async () => {
+  const saveBoard = useCallback(async () => {
     try {
-      const data = { version: 1, ...snapshot() };
-      const bytes = encode(data);
-      await fetch(`/api/boards/${roomId}`, { method: 'POST', body: bytes });
+      const data = {
+        version: 1,
+        ...snapshot(),
+      };
+
+      const bytes = new TextEncoder().encode(
+        JSON.stringify(data),
+      );
+
+      await fetch(
+        `/api/boards/${roomId}`,
+        {
+          method: 'POST',
+          body: bytes,
+        },
+      );
+
       // no UI toast; silent autosave
     } catch (e) {
       console.warn('Save failed', e);
     }
-  };
+  }, [roomId, snapshot]);
 
   // Debounced autosave whenever content changes
   useEffect(() => {
-    const id = setTimeout(() => { void saveBoard(); }, 800);
+    if (
+      persistenceReadyRoomId !== roomId
+    ) {
+      return;
+    }
+
+    const id = setTimeout(
+      () => {
+        void saveBoard();
+      },
+      800,
+    );
+
     return () => clearTimeout(id);
-  }, [strokes, shapes]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    persistenceReadyRoomId,
+    roomId,
+    saveBoard,
+  ]);
 
   // Restore board on mount if exists
   useEffect(() => {
     let cancelled = false;
+
+    setPersistenceReadyRoomId(null);
+
     (async () => {
       try {
-        const meta = await fetch(`/api/boards/${roomId}?format=json`).then(r => r.json());
+        const meta = await fetch(
+          `/api/boards/${roomId}?format=json`,
+        ).then((response) => response.json());
+
         if (!meta?.exists) return;
-        const buf = await fetch(`/api/boards/${roomId}`).then(r => r.arrayBuffer());
+
+        const buf = await fetch(
+          `/api/boards/${roomId}`,
+        ).then((response) => response.arrayBuffer());
+
         if (cancelled) return;
-        const saved = decode(buf) as { version: number; strokes: Stroke[]; shapes: ShapeItem[] };
-        if (saved?.version === 1 && Array.isArray(saved.strokes) && Array.isArray(saved.shapes)) {
+
+        const saved = decode(buf) as {
+          version: number;
+          strokes: Stroke[];
+          shapes: ShapeItem[];
+        };
+
+        if (
+          saved?.version === 1 &&
+          Array.isArray(saved.strokes) &&
+          Array.isArray(saved.shapes)
+        ) {
           setStrokes(saved.strokes);
           setShapes(saved.shapes);
         }
       } catch (e) {
         console.warn('Load failed', e);
+      } finally {
+        if (!cancelled) {
+          setPersistenceReadyRoomId(
+            roomId,
+          );
+        }
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, [roomId]);
   // ------------------------------------------------------
 
   // (Optional) manual save trigger from Toolbar
   useEffect(() => {
-    const onSave = () => { void saveBoard(); };
-    window.addEventListener('wb-save', onSave);
-    return () => window.removeEventListener('wb-save', onSave);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const onSave = () => {
+      void saveBoard();
+    };
+
+    window.addEventListener(
+      'wb-save',
+      onSave,
+    );
+
+    return () => {
+      window.removeEventListener(
+        'wb-save',
+        onSave,
+      );
+    };
+  }, [saveBoard]);
 
   const normalizeChatUser = (raw?: string) => {
     const value = raw?.trim();
