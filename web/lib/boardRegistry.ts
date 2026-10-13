@@ -187,8 +187,14 @@ export const extractRoomId = (
         .split(/[?#]/)[0];
   }
 
-  const decoded =
-    decodeURIComponent(candidate);
+  let decoded: string;
+
+  try {
+    decoded =
+      decodeURIComponent(candidate);
+  } catch {
+    return null;
+  }
 
   if (
     !/^[A-Za-z0-9_-]{1,128}$/.test(
