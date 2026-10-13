@@ -15,6 +15,11 @@ import {
   verifyRealtimeToken,
 } from './realtimeAuth';
 
+import {
+  loadPersistedYjsDocument,
+  storePersistedYjsDocument,
+} from './documentPersistence';
+
 
 try {
   loadEnvFile(
@@ -235,6 +240,64 @@ const server =
   new Server({
     port,
     address,
+
+    /*
+     * Hocuspocus 3.2.4 defaults:
+     *   debounce: 2000 ms
+     *   maxDebounce: 10000 ms
+     *   unloadImmediately: true
+     *
+     * Keep these explicit because they are now part
+     * of the persistence/durability contract.
+     */
+    debounce:
+      2000,
+
+    maxDebounce:
+      10000,
+
+    unloadImmediately:
+      true,
+
+    onLoadDocument:
+      async ({
+        documentName,
+      }) => {
+        const result =
+          await loadPersistedYjsDocument(
+            documentName,
+          );
+
+        if (!result.document) {
+          console.log(
+            `[persistence] load-miss room=${documentName}`,
+          );
+
+          return null;
+        }
+
+        console.log(
+          `[persistence] loaded room=${documentName} bytes=${result.bytes}`,
+        );
+
+        return result.document;
+      },
+
+    onStoreDocument:
+      async ({
+        documentName,
+        document,
+      }) => {
+        const result =
+          await storePersistedYjsDocument(
+            documentName,
+            document,
+          );
+
+        console.log(
+          `[persistence] stored room=${documentName} bytes=${result.bytes}`,
+        );
+      },
 
     onAuthenticate:
       async ({
