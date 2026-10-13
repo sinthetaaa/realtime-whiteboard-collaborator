@@ -353,22 +353,174 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
   const [boardTitleDraft, setBoardTitleDraft] =
     useState('Untitled board');
 
+  const [boardCreatedAt, setBoardCreatedAt] =
+    useState<number | null>(null);
+
+  const boardOpenedAtRef =
+    useRef(Date.now());
+
   const [isEditingBoardTitle, setIsEditingBoardTitle] =
     useState(false);
 
   const boardTitleInputRef =
     useRef<HTMLInputElement | null>(null);
 
+  const isEditingBoardTitleRef =
+    useRef(false);
+
   useEffect(() => {
-    const savedTitle = window.localStorage
-      .getItem(`wb_board_title_${roomId}`)
-      ?.trim();
+    let cancelled = false;
 
-    const nextTitle =
-      savedTitle || 'Untitled board';
+    setBoardCreatedAt(null);
+    boardOpenedAtRef.current =
+      Date.now();
 
-    setBoardTitle(nextTitle);
-    setBoardTitleDraft(nextTitle);
+    const storageKey =
+      `wb_board_title_${roomId}`;
+
+    const legacyTitle =
+      window.localStorage
+        .getItem(storageKey)
+        ?.trim();
+
+    const fallbackTitle =
+      legacyTitle ||
+      'Untitled board';
+
+    const applyCanonicalMetadata = (
+      title: string,
+      createdAt: unknown,
+    ) => {
+      if (cancelled) {
+        return;
+      }
+
+      const nextTitle =
+        title.trim() ||
+        'Untitled board';
+
+      const nextCreatedAt =
+        typeof createdAt === 'number' &&
+        Number.isFinite(createdAt) &&
+        createdAt > 0
+          ? createdAt
+          : null;
+
+      setBoardCreatedAt(
+        nextCreatedAt,
+      );
+
+      setBoardTitle(nextTitle);
+      setBoardTitleDraft(nextTitle);
+
+      window.localStorage.setItem(
+        storageKey,
+        nextTitle,
+      );
+    };
+
+    void (async () => {
+      try {
+        const metadataUrl =
+          `/api/boards/${encodeURIComponent(
+            roomId,
+          )}/metadata`;
+
+        const response =
+          await fetch(
+            metadataUrl,
+            {
+              cache: 'no-store',
+            },
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            `Metadata load failed: ${response.status}`,
+          );
+        }
+
+        const payload =
+          (await response.json()) as {
+            ok?: boolean;
+            exists?: boolean;
+            metadata?: {
+              title?: string;
+              createdAt?: number;
+            } | null;
+          };
+
+        const canonicalTitle =
+          payload.metadata?.title?.trim();
+
+        if (
+          payload.ok &&
+          payload.exists &&
+          canonicalTitle
+        ) {
+          applyCanonicalMetadata(
+            canonicalTitle,
+            payload.metadata?.createdAt,
+          );
+
+          return;
+        }
+
+        const createResponse =
+          await fetch(
+            metadataUrl,
+            {
+              method: 'PUT',
+              headers: {
+                'Content-Type':
+                  'application/json',
+              },
+              body: JSON.stringify({
+                title:
+                  fallbackTitle,
+              }),
+            },
+          );
+
+        if (!createResponse.ok) {
+          throw new Error(
+            `Metadata create failed: ${createResponse.status}`,
+          );
+        }
+
+        const createPayload =
+          (await createResponse.json()) as {
+            ok?: boolean;
+            metadata?: {
+              title?: string;
+              createdAt?: number;
+            } | null;
+          };
+
+        const migratedTitle =
+          createPayload.metadata?.title?.trim() ||
+          fallbackTitle;
+
+        applyCanonicalMetadata(
+          migratedTitle,
+          createPayload.metadata?.createdAt,
+        );
+      } catch (error) {
+        console.warn(
+          'Board metadata bootstrap failed',
+          error,
+        );
+
+        applyCanonicalMetadata(
+          fallbackTitle,
+          null,
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [roomId]);
 
   useEffect(() => {
@@ -385,13 +537,22 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
   }, [isEditingBoardTitle]);
 
   const beginBoardTitleEdit = () => {
+    isEditingBoardTitleRef.current =
+      true;
+
     setBoardTitleDraft(boardTitle);
     setIsEditingBoardTitle(true);
   };
 
   const commitBoardTitle = () => {
     const nextTitle =
-      boardTitleDraft.trim() || 'Untitled board';
+      (
+        boardTitleDraft.trim() ||
+        'Untitled board'
+      ).slice(0, 120);
+
+    isEditingBoardTitleRef.current =
+      false;
 
     setBoardTitle(nextTitle);
     setBoardTitleDraft(nextTitle);
@@ -401,9 +562,58 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
       `wb_board_title_${roomId}`,
       nextTitle,
     );
+
+    void (async () => {
+      try {
+        const response =
+          await fetch(
+            `/api/boards/${encodeURIComponent(
+              roomId,
+            )}/metadata`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Content-Type':
+                  'application/json',
+              },
+              body: JSON.stringify({
+                title:
+                  nextTitle,
+              }),
+            },
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            `Metadata title update failed: ${response.status}`,
+          );
+        }
+
+        const yMeta =
+          yRef.current?.yMeta;
+
+        if (
+          yMeta &&
+          yMeta.get('title') !== nextTitle
+        ) {
+          yMeta.set(
+            'title',
+            nextTitle,
+          );
+        }
+      } catch (error) {
+        console.warn(
+          'Board title save failed',
+          error,
+        );
+      }
+    })();
   };
 
   const cancelBoardTitleEdit = () => {
+    isEditingBoardTitleRef.current =
+      false;
+
     setBoardTitleDraft(boardTitle);
     setIsEditingBoardTitle(false);
   };
@@ -424,6 +634,7 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
   useEffect(() => {
     if (
       roomId === 'demo' ||
+      boardCreatedAt == null ||
       !localUserId ||
       removedFromBoard
     ) {
@@ -483,7 +694,10 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
         title:
           boardTitle.trim() ||
           'Untitled board',
-        lastOpenedAt: now,
+        createdAt:
+          boardCreatedAt,
+        lastOpenedAt:
+          boardOpenedAtRef.current,
         lastActiveAt: now,
         people:
           Array.from(
@@ -512,6 +726,7 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
   }, [
     roomId,
     boardTitle,
+    boardCreatedAt,
     localUserId,
     hostUserId,
     removedFromBoard,
@@ -996,6 +1211,32 @@ export default function Whiteboard({ roomId }: { roomId: string }) {
 
       hostUserIdRef.current = nextHostUserId;
       setHostUserId(nextHostUserId);
+
+      const nextBoardTitle =
+        yMeta
+          .get('title')
+          ?.trim()
+          .slice(0, 120) ||
+        '';
+
+      if (nextBoardTitle) {
+        setBoardTitle(
+          nextBoardTitle,
+        );
+
+        if (
+          !isEditingBoardTitleRef.current
+        ) {
+          setBoardTitleDraft(
+            nextBoardTitle,
+          );
+        }
+
+        window.localStorage.setItem(
+          `wb_board_title_${roomId}`,
+          nextBoardTitle,
+        );
+      }
 
       const removed =
         Boolean(

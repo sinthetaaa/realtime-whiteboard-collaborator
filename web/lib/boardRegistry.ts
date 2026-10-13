@@ -129,8 +129,8 @@ export const upsertBoardRegistryEntry = (
   const entry: BoardRegistryEntry = {
     ...next,
     createdAt:
-      existing?.createdAt ??
       next.createdAt ??
+      existing?.createdAt ??
       Date.now(),
   };
 
